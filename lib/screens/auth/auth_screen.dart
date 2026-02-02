@@ -12,11 +12,7 @@ class AuthScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFAD4D4),
-              Color(0xFFF5E6E0),
-              Color(0xFFE8F4F8),
-            ],
+            colors: [Color(0xFFFAD4D4), Color(0xFFF5E6E0), Color(0xFFE8F4F8)],
           ),
         ),
         child: SafeArea(
@@ -49,7 +45,7 @@ class AuthScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 // App Name
                 const Text(
-                  'Memory Harbor',
+                  'MemHarbor',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w600,
@@ -134,10 +130,7 @@ class AuthScreen extends StatelessWidget {
             const SizedBox(width: 12),
             Text(
               text,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ],
         ),

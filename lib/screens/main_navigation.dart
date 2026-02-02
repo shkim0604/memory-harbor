@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'home/home_screen.dart';
 import 'call/call_screen.dart';
+import 'history/history_screen.dart';
 import 'settings/settings_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -13,19 +14,31 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  int _callScreenKey = 0;
+  bool _startConnecting = false;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CallScreen(),
-    const SettingsScreen(),
-  ];
+  void _onCallPressed() {
+    setState(() {
+      _startConnecting = true;
+      _callScreenKey++; // Key 변경으로 CallScreen 리빌드
+      _currentIndex = 1; // 통화 탭으로 이동
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          HomeScreen(onCallPressed: _onCallPressed),
+          CallScreen(
+            key: ValueKey(_callScreenKey),
+            startConnecting: _startConnecting,
+          ),
+          const HistoryScreen(),
+          const SettingsScreen(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -41,6 +54,11 @@ class _MainNavigationState extends State<MainNavigation> {
           currentIndex: _currentIndex,
           onTap: (index) {
             setState(() {
+              // 통화 탭 직접 클릭 시 연결 시작 안함
+              if (index == 1) {
+                _startConnecting = false;
+                _callScreenKey++;
+              }
               _currentIndex = index;
             });
           },
@@ -52,9 +70,7 @@ class _MainNavigationState extends State<MainNavigation> {
             fontWeight: FontWeight.w600,
             fontSize: 12,
           ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 12,
-          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
@@ -65,6 +81,11 @@ class _MainNavigationState extends State<MainNavigation> {
               icon: Icon(Icons.phone_outlined),
               activeIcon: Icon(Icons.phone),
               label: '통화',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: '히스토리',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),

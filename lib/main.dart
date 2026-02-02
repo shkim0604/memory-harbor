@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'firebase/firebase_config.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/main_navigation.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseConfig.initialize();
   runApp(const MyApp());
 }
 
@@ -14,7 +17,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Memory Harbor',
+      title: 'MemHarbor',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),
@@ -75,8 +78,8 @@ class _SplashScreenState extends State<SplashScreen>
                 const AuthScreen(),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
@@ -142,7 +145,7 @@ class _SplashScreenState extends State<SplashScreen>
                       const SizedBox(height: 24),
                       // App Name
                       const Text(
-                        'Memory Harbor',
+                        'MemHarbor',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,

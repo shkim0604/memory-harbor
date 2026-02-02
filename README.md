@@ -1,16 +1,77 @@
 # memory_harbor
 
-A new Flutter project.
+Flutter client for the MemHarbor app (memory + caregiving).
 
-## Getting Started
+## Project Structure
 
-This project is a starting point for a Flutter application.
+```
+lib/
+  data/
+    mock_data.dart         # Local seed data for UI development
+  firebase/
+    firebase_config.dart        # Env + emulator routing for Firebase
+    firebase_options_dev.dart   # Dev Firebase options (generated)
+    firebase_options_prod.dart  # Prod Firebase options (generated)
+  models/
+    call.dart              # Call domain model
+    care_receiver.dart     # CareReceiver domain model
+    group.dart             # Group + GroupStats
+    model_helpers.dart     # CallStatus + date parsing helpers
+    residence.dart         # Residence + ResidenceStats
+    review.dart            # Review model
+    user.dart              # AppUser model
+    models.dart            # Barrel exports
+  screens/
+    auth/                  # Auth-related screens
+    call/                  # Call UX (call screen, call detail)
+    history/               # Memory timeline / history screens
+    home/                  # Home dashboard
+  theme/                   # App theme & colors
+  widgets/                 # Reusable UI widgets
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Firebase Setup (Prod/Dev + Emulator)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+This app uses environment flags to choose Firebase options and emulator routing.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Env Flags
+
+- `ENV=prod|dev` (default: `dev`)
+- `USE_EMULATOR=true|false` (default: `true`)
+
+### Initialize (already wired)
+
+`lib/main.dart` calls `FirebaseConfig.initialize()` which:
+1) selects the correct Firebase options file
+2) routes to local emulators when `ENV=dev` and `USE_EMULATOR=true`
+
+### Generate Firebase options
+
+This project expects **separate option files**:
+- `lib/firebase_options_prod.dart`
+- `lib/firebase_options_dev.dart`
+
+Generate them with FlutterFire CLI (paths match `lib/firebase/`):
+
+```
+flutterfire configure --project=<prod-project-id> --out=lib/firebase/firebase_options_prod.dart --platforms=ios,android
+flutterfire configure --project=<dev-project-id> --out=lib/firebase/firebase_options_dev.dart --platforms=ios,android
+```
+
+### Run
+
+Prod (disable emulator):
+```
+flutter run --dart-define=ENV=prod --dart-define=USE_EMULATOR=false
+```
+
+Dev + emulator:
+```
+flutter run --dart-define=ENV=dev --dart-define=USE_EMULATOR=true
+```
+
+## Notes
+
+- `lib/data/mock_data.dart` is used for UI scaffolding and demo data.
+- The domain models in `lib/models/` are plain Dart models, designed to be
+  firestore-friendly (json serialization + snapshots).

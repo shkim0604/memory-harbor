@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "498442703852",
+    "project_id": "memory-harbor",
+    "storage_bucket": "memory-harbor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:498442703852:android:c12b2cb0687bbd657466c9",
+        "android_client_info": {
+          "package_name": "org.delighthouse.memory_harbor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqnjNoK4H6Bld5bCZYt0w9hRSmvjzlbpc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,6 @@
 {
-    "name": "memory_harbor",
-    "short_name": "memory_harbor",
+    "name": "MemHarbor",
+    "short_name": "MemHarbor",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
