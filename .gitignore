@@ -46,3 +46,6 @@ app.*.map.json
 
 # Firebase
 firepit-log.txt
+# Local build outputs
+android/build/
+lib/firebase/build/
