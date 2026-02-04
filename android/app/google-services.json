@@ -12,7 +12,12 @@
           "package_name": "org.delighthouse.memory_harbor"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "498442703852-hb1nukntmspso07oicm2qvusrl450nbd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAqnjNoK4H6Bld5bCZYt0w9hRSmvjzlbpc"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "498442703852-hb1nukntmspso07oicm2qvusrl450nbd.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "498442703852-3dn62mfnfvlb38j27qbouq2t8p32bsrr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.delighthouse.memory-harbor"
+              }
+            }
+          ]
         }
       }
     }

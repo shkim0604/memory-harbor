@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
+import '../../viewmodels/history_detail_viewmodel.dart';
 
-class HistoryDetailScreen extends StatelessWidget {
+class HistoryDetailScreen extends StatefulWidget {
   final String residenceId;
   final String era;
   final String location;
   final String detail;
   final Color color;
+  final String receiverId;
+  final ResidenceStats? residenceStats;
 
   const HistoryDetailScreen({
     super.key,
@@ -18,13 +20,45 @@ class HistoryDetailScreen extends StatelessWidget {
     required this.location,
     required this.detail,
     required this.color,
+    required this.receiverId,
+    this.residenceStats,
   });
 
   @override
+  State<HistoryDetailScreen> createState() => _HistoryDetailScreenState();
+}
+
+class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
+  final HistoryDetailViewModel _viewModel = HistoryDetailViewModel();
+  Color get color => widget.color;
+  String get era => widget.era;
+  String get location => widget.location;
+  String get detail => widget.detail;
+  String get residenceId => widget.residenceId;
+  String get receiverId => widget.receiverId;
+  ResidenceStats? get residenceStats => widget.residenceStats;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewModel.init(
+      receiverId: widget.receiverId,
+      residenceId: widget.residenceId,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _viewModel.dispose();
+    super.dispose();
+  }
+  @override
   Widget build(BuildContext context) {
-    final keywords = MockData.getKeywordsByResidenceId(residenceId);
-    final bulletStories = MockData.getStoryCommentsByResidenceId(residenceId);
-    final callHistory = MockData.getCallHistoryByResidenceId(residenceId);
+    final keywords = residenceStats?.keywords ?? const [];
+    final bulletStories = residenceStats?.humanComments ?? const [];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -109,7 +143,7 @@ class HistoryDetailScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // (3) 통화 내역 섹션
-                  _buildCallHistorySection(callHistory),
+                  _buildCallHistorySection(),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -277,7 +311,7 @@ class HistoryDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCallHistorySection(List<Call> history) {
+  Widget _buildCallHistorySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -305,17 +339,28 @@ class HistoryDetailScreen extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            Text(
-              '${history.length}건',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 16),
-        ...history.map((call) => _buildCallHistoryCard(call)).toList(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '${_viewModel.filteredCalls.length}건',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ..._viewModel.filteredCalls
+                .map((call) => _buildCallHistoryCard(call))
+                .toList(),
+          ],
+        ),
       ],
     );
   }
@@ -323,8 +368,6 @@ class HistoryDetailScreen extends StatelessWidget {
   Widget _buildCallHistoryCard(Call call) {
     final summary =
         call.humanSummary.isNotEmpty ? call.humanSummary : call.humanNotes;
-    final caregiverImage =
-        MockData.getCaregiverProfileImage(call.caregiverUserId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -343,7 +386,7 @@ class HistoryDetailScreen extends StatelessWidget {
       child: Row(
         children: [
           ProfileAvatar(
-            imageUrl: caregiverImage,
+            imageUrl: null,
             fallbackText: call.giverNameSnapshot,
             size: 44,
             backgroundColor: AppColors.primaryLight.withValues(alpha: 0.3),
@@ -382,12 +425,12 @@ class HistoryDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                MockData.formatDate(call.startedAt),
+                '${call.startedAt.year}.${call.startedAt.month.toString().padLeft(2, '0')}.${call.startedAt.day.toString().padLeft(2, '0')}',
                 style: const TextStyle(fontSize: 12, color: AppColors.textHint),
               ),
               const SizedBox(height: 2),
               Text(
-                MockData.formatDuration(call.durationSec),
+                _formatDuration(call.durationSec),
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -399,5 +442,20 @@ class HistoryDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDuration(int? seconds) {
+    if (seconds == null) return '';
+    final duration = Duration(seconds: seconds);
+    final totalMinutes = duration.inMinutes;
+    if (totalMinutes < 60) {
+      return '${totalMinutes}분';
+    }
+    final hours = duration.inHours;
+    final minutes = totalMinutes % 60;
+    if (minutes == 0) {
+      return '${hours}시간';
+    }
+    return '${hours}시간 ${minutes}분';
   }
 }

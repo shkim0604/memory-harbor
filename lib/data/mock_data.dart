@@ -213,10 +213,7 @@ class MockData {
       totalCalls: 3,
       lastCallAt: DateTime(2026, 1, 28),
       aiSummary: '',
-      humanComments: const [
-        '예술의전당 클래식 공연을 좋아하신다고.',
-        '저녁마다 양재천 산책이 일과라는 이야기.',
-      ],
+      humanComments: const ['예술의전당 클래식 공연을 좋아하신다고.', '저녁마다 양재천 산책이 일과라는 이야기.'],
     ),
   };
 
@@ -226,6 +223,7 @@ class MockData {
   static final List<Call> myCallHistory = [
     Call(
       callId: 'call_20260128_me',
+      channelId: 'channel_20260128_me',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_me',
@@ -246,6 +244,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260125_me',
+      channelId: 'channel_20260125_me',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_me',
@@ -266,6 +265,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260122_me',
+      channelId: 'channel_20260122_me',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_me',
@@ -289,6 +289,7 @@ class MockData {
   static final List<Call> communityCallHistory = [
     Call(
       callId: 'call_20260127_minsu',
+      channelId: 'channel_20260127_minsu',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_minsu',
@@ -309,6 +310,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260126_younghee',
+      channelId: 'channel_20260126_younghee',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_younghee',
@@ -329,6 +331,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260124_jihoon',
+      channelId: 'channel_20260124_jihoon',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_jihoon',
@@ -352,6 +355,7 @@ class MockData {
   static final List<Call> _locationHistoryCalls = [
     Call(
       callId: 'call_20260115_andong',
+      channelId: 'channel_20260115_andong',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_minsu',
@@ -372,6 +376,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260110_andong',
+      channelId: 'channel_20260110_andong',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_younghee',
@@ -392,6 +397,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260105_andong',
+      channelId: 'channel_20260105_andong',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_jihoon',
@@ -412,6 +418,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260127_jongno',
+      channelId: 'channel_20260127_jongno',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_minsu',
@@ -432,6 +439,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260122_jongno',
+      channelId: 'channel_20260122_jongno',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_sujin',
@@ -452,6 +460,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260125_gangnam',
+      channelId: 'channel_20260125_gangnam',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_younghee',
@@ -472,6 +481,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260118_gangnam',
+      channelId: 'channel_20260118_gangnam',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_jihoon',
@@ -492,6 +502,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260120_bundang',
+      channelId: 'channel_20260120_bundang',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_sujin',
@@ -512,6 +523,7 @@ class MockData {
     ),
     Call(
       callId: 'call_20260128_seocho',
+      channelId: 'channel_20260128_seocho',
       groupId: group.groupId,
       receiverId: careReceiver.receiverId,
       caregiverUserId: 'user_minsu',
@@ -533,10 +545,10 @@ class MockData {
   ];
 
   static List<Call> get allCalls => [
-        ...myCallHistory,
-        ...communityCallHistory,
-        ..._locationHistoryCalls,
-      ];
+    ...myCallHistory,
+    ...communityCallHistory,
+    ..._locationHistoryCalls,
+  ];
 
   // ----------------------------------------------------------
   // 헬퍼 메서드

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../viewmodels/call_detail_viewmodel.dart';
 import '../../theme/app_colors.dart';
 
 class CallDetailScreen extends StatefulWidget {
@@ -8,6 +8,7 @@ class CallDetailScreen extends StatefulWidget {
   final String era;
   final String location;
   final String detail;
+  final String receiverId;
 
   const CallDetailScreen({
     super.key,
@@ -15,6 +16,7 @@ class CallDetailScreen extends StatefulWidget {
     required this.era,
     required this.location,
     required this.detail,
+    required this.receiverId,
   });
 
   @override
@@ -23,15 +25,14 @@ class CallDetailScreen extends StatefulWidget {
 
 class _CallDetailScreenState extends State<CallDetailScreen>
     with TickerProviderStateMixin {
+  final CallDetailViewModel _viewModel = CallDetailViewModel();
   final PageController _carouselController = PageController(
     viewportFraction: 0.85,
   );
   late AnimationController _keywordAnimController;
-  late List<Call> _previousCalls;
 
   // 현재 통화 키워드
   List<String> _currentKeywords = [];
-  List<String> _allKeywords = [];
 
   // 통화 상태
   bool _isMuted = false;
@@ -44,24 +45,28 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _allKeywords = MockData.getKeywordsByResidenceId(widget.residenceId);
-    _previousCalls =
-        MockData.getCallHistoryByResidenceId(widget.residenceId);
     // 빈 상태로 시작 - 사용자가 수동으로 추가
     _currentKeywords = [];
+    _viewModel.init(
+      receiverId: widget.receiverId,
+      residenceId: widget.residenceId,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
   void dispose() {
     _carouselController.dispose();
     _keywordAnimController.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
-  void _showAddKeywordSheet() {
-    final availableKeywords = _allKeywords
-        .where((k) => !_currentKeywords.contains(k))
-        .toList();
+  void _showAddKeywordSheet(List<String> allKeywords) {
+    final availableKeywords =
+        allKeywords.where((k) => !_currentKeywords.contains(k)).toList();
     final customController = TextEditingController();
 
     showModalBottomSheet(
@@ -240,13 +245,10 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       ),
       body: Column(
         children: [
-          // 상단 키워드 카드
-          _buildKeywordsCard(),
-
-          // 이전 통화요약 Carousel
-          Expanded(child: _buildPreviousCallsSection()),
-
-          // 하단 통화 상태창
+          _buildKeywordsCard(_viewModel.keywords),
+          Expanded(
+            child: _buildPreviousCallsSection(_viewModel.previousCalls),
+          ),
           _buildCallStatusBar(),
         ],
       ),
@@ -501,7 +503,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // ============================================================
   // 키워드 카드
   // ============================================================
-  Widget _buildKeywordsCard() {
+  Widget _buildKeywordsCard(List<String> allKeywords) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -568,7 +570,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
               ),
               // 키워드 추가 버튼
               GestureDetector(
-                onTap: _showAddKeywordSheet,
+                onTap: () => _showAddKeywordSheet(allKeywords),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -678,7 +680,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // ============================================================
   // 이전 통화요약 섹션
   // ============================================================
-  Widget _buildPreviousCallsSection() {
+  Widget _buildPreviousCallsSection(List<Call> previousCalls) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -699,7 +701,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
               ),
               const Spacer(),
               Text(
-                '${_previousCalls.length}건',
+                '${previousCalls.length}건',
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
@@ -712,14 +714,14 @@ class _CallDetailScreenState extends State<CallDetailScreen>
         Expanded(
           child: PageView.builder(
             controller: _carouselController,
-            itemCount: _previousCalls.length,
+            itemCount: previousCalls.length,
             itemBuilder: (context, index) {
-              return _buildSummaryCard(_previousCalls[index], index);
+              return _buildSummaryCard(previousCalls[index], index);
             },
           ),
         ),
         // 페이지 인디케이터
-        _buildPageIndicator(),
+        _buildPageIndicator(previousCalls.length),
         const SizedBox(height: 16),
       ],
     );
@@ -736,8 +738,9 @@ class _CallDetailScreenState extends State<CallDetailScreen>
         : '알 수 없음';
     final caregiverInitial =
         caregiverName.isNotEmpty ? caregiverName[0] : '?';
-    final dateText = MockData.formatDate(call.startedAt);
-    final durationText = MockData.formatDuration(call.durationSec);
+    final dateText =
+        '${call.startedAt.year}.${call.startedAt.month.toString().padLeft(2, '0')}.${call.startedAt.day.toString().padLeft(2, '0')}';
+    final durationText = _formatDuration(call.durationSec);
 
     return AnimatedBuilder(
       animation: _carouselController,
@@ -853,13 +856,13 @@ class _CallDetailScreenState extends State<CallDetailScreen>
     );
   }
 
-  Widget _buildPageIndicator() {
+  Widget _buildPageIndicator(int count) {
     return AnimatedBuilder(
       animation: _carouselController,
       builder: (context, child) {
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_previousCalls.length, (index) {
+          children: List.generate(count, (index) {
             double currentPage = 0;
             if (_carouselController.position.haveDimensions) {
               currentPage = _carouselController.page ?? 0;
@@ -881,5 +884,20 @@ class _CallDetailScreenState extends State<CallDetailScreen>
         );
       },
     );
+  }
+
+  String _formatDuration(int? seconds) {
+    if (seconds == null) return '';
+    final duration = Duration(seconds: seconds);
+    final totalMinutes = duration.inMinutes;
+    if (totalMinutes < 60) {
+      return '${totalMinutes}분';
+    }
+    final hours = duration.inHours;
+    final minutes = totalMinutes % 60;
+    if (minutes == 0) {
+      return '${hours}시간';
+    }
+    return '${hours}시간 ${minutes}분';
   }
 }

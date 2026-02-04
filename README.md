@@ -6,12 +6,37 @@ Flutter client for the MemHarbor app (memory + caregiving).
 
 ```
 lib/
+  config/
+    agora_config.dart      # Agora appId + API base URL
   data/
     mock_data.dart         # Local seed data for UI development
   firebase/
     firebase_config.dart        # Env + emulator routing for Firebase
     firebase_options_dev.dart   # Dev Firebase options (generated)
     firebase_options_prod.dart  # Prod Firebase options (generated)
+    seed.py                     # Emulator seed script
+  firebase_options.dart         # Default FlutterFire output (unused)
+  services/
+    auth_service.dart       # Google/Apple auth wrappers
+    user_service.dart       # Firestore user CRUD
+    call_service.dart       # Call session CRUD
+    care_receiver_service.dart  # Care receiver CRUD
+    group_service.dart      # Group CRUD
+    permission_service.dart # Runtime permission requests
+    seed_service.dart       # Emulator seed helper
+    storage_service.dart    # Storage upload/download
+    agora_service.dart      # Agora RTC + server recording bridge
+  viewmodels/
+    auth_viewmodel.dart         # Auth state + actions
+    call_detail_viewmodel.dart  # Call detail screen state
+    call_session_viewmodel.dart # Live call session state
+    call_viewmodel.dart         # Call list/state
+    history_detail_viewmodel.dart # History detail screen state
+    history_viewmodel.dart      # History list/state
+    home_viewmodel.dart         # Home dashboard state
+    onboarding_viewmodel.dart   # Onboarding flow state
+    reviews_viewmodel.dart      # Reviews state
+    settings_viewmodel.dart     # Settings state
   models/
     call.dart              # Call domain model
     care_receiver.dart     # CareReceiver domain model
@@ -26,9 +51,50 @@ lib/
     call/                  # Call UX (call screen, call detail)
     history/               # Memory timeline / history screens
     home/                  # Home dashboard
+    reviews/               # Reviews screen
+    settings/              # Settings screen
+    main_navigation.dart   # Bottom tab shell
   theme/                   # App theme & colors
   widgets/                 # Reusable UI widgets
 ```
+
+## Architecture (MVVM)
+
+This project follows a lightweight MVVM structure:
+
+- `screens/` (View): UI only, renders state and forwards user actions.
+- `viewmodels/` (ViewModel): owns UI state, async flows, and pagination logic.
+- `services/` (Model layer access): Firestore/Auth/Storage/3rd-party integration.
+- `models/` (Domain models): plain Dart models + serialization.
+
+**Guidelines**
+1. UI should not directly access Firestore/Auth. Use a ViewModel.
+2. ViewModels expose plain fields + methods and notify the view via `setState`.
+3. Services are stateless singletons; keep network/storage details there.
+
+## Call + Recording
+
+This client uses Agora RTC for voice and delegates recording to the server.
+
+Flow
+```
+CallSessionViewModel.startCall()
+  -> AgoraService.initialize()
+  -> fetchToken() (if needed)
+  -> joinChannel()
+  -> onJoinChannelSuccess
+  -> onUserJoined (remote)
+  -> /api/recording/start
+```
+
+Recording rules
+- Recording starts only after both users are in the channel.
+- If a user explicitly ends the call, recording stops immediately.
+- If a user drops due to network/timeout, we wait 1 minute for rejoin before stopping.
+
+Server endpoints
+- `POST /api/recording/start` with `channel`, `uid`
+- `POST /api/recording/stop` with `channel`, `uid`
 
 ## Firebase Setup (Prod/Dev + Emulator)
 
@@ -58,6 +124,10 @@ flutterfire configure --project=<prod-project-id> --out=lib/firebase/firebase_op
 flutterfire configure --project=<dev-project-id> --out=lib/firebase/firebase_options_dev.dart --platforms=ios,android
 ```
 
+Note: `lib/firebase_options.dart` is the default FlutterFire output and is
+**not used** by this project (we route through `lib/firebase/firebase_config.dart`).
+You can remove it or keep it, but it should not be referenced by app code.
+
 ### Run
 
 Prod (disable emulator):
@@ -65,10 +135,39 @@ Prod (disable emulator):
 flutter run --dart-define=ENV=prod --dart-define=USE_EMULATOR=false
 ```
 
-Dev + emulator:
+Dev + emulator (iOS Simulator / desktop / web):
 ```
 flutter run --dart-define=ENV=dev --dart-define=USE_EMULATOR=true
 ```
+
+Dev + emulator (Android Emulator):
+```
+flutter run --dart-define=ENV=dev --dart-define=USE_EMULATOR=true
+```
+Notes:
+- Android emulator routes to your Mac's `localhost` via `10.0.2.2` automatically.
+
+Dev + emulator (physical device: iPhone / real Android):
+```
+flutter run --dart-define=ENV=dev --dart-define=USE_EMULATOR=true --dart-define=EMULATOR_HOST=<your-mac-ip>
+```
+Notes:
+- Replace `<your-mac-ip>` with your Mac LAN IP, e.g. `ipconfig getifaddr en0`.
+- Ensure the phone and Mac are on the same network (Wi‑Fi), and VPN is off.
+- iOS will prompt for Local Network permission on first run (required for emulator access).
+
+### Seed Firestore Emulator (Python)
+
+You can seed the Firestore emulator without running the app:
+
+```
+cd lib/firebase
+python seed.py
+```
+
+Notes:
+- Firestore emulator must be running on `localhost:8081`.
+- This script uses anonymous credentials for the emulator only.
 
 ## Notes
 

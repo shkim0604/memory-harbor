@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum CallStatus { completed, canceled, failed }
 
 CallStatus callStatusFromString(String v) {
@@ -27,6 +29,7 @@ String callStatusToString(CallStatus s) {
 DateTime? parseDateTime(dynamic v) {
   if (v == null) return null;
   if (v is DateTime) return v;
+  if (v is Timestamp) return v.toDate();
   if (v is String) return DateTime.tryParse(v);
   return null;
 }

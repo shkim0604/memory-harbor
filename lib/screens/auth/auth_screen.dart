@@ -1,8 +1,30 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
+import '../../viewmodels/auth_viewmodel.dart';
 
-class AuthScreen extends StatelessWidget {
+class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
+
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  final AuthViewModel _viewModel = AuthViewModel();
+
+  @override
+  void initState() {
+    super.initState();
+    _viewModel.init(onChanged: () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _viewModel.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,23 +85,17 @@ class AuthScreen extends StatelessWidget {
                 ),
                 const Spacer(flex: 2),
                 // Login Buttons
-                _buildLoginButton(
-                  context,
-                  icon: Icons.g_mobiledata_rounded,
-                  text: 'Google로 계속하기',
-                  backgroundColor: Colors.white,
-                  textColor: AppColors.textPrimary,
-                  onPressed: () => _handleGoogleLogin(context),
-                ),
-                const SizedBox(height: 16),
-                _buildLoginButton(
-                  context,
-                  icon: Icons.apple,
-                  text: 'Apple로 계속하기',
-                  backgroundColor: Colors.black,
-                  textColor: Colors.white,
-                  onPressed: () => _handleAppleLogin(context),
-                ),
+                if (_viewModel.isLoading)
+                  const CircularProgressIndicator(color: AppColors.secondary)
+                else
+                  _buildLoginButton(
+                    context,
+                    icon: Icons.g_mobiledata_rounded,
+                    text: 'Google로 계속하기',
+                    backgroundColor: Colors.white,
+                    textColor: AppColors.textPrimary,
+                    onPressed: _handleGoogleLogin,
+                  ),
                 const Spacer(),
                 // Terms
                 Padding(
@@ -138,17 +154,25 @@ class AuthScreen extends StatelessWidget {
     );
   }
 
-  void _handleGoogleLogin(BuildContext context) {
-    // TODO: Implement Google login
-    _navigateToHome(context);
+  Future<void> _handleGoogleLogin() async {
+    final result = await _viewModel.signInWithGoogle();
+    if (!mounted) return;
+
+    if (result.errorMessage != null) {
+      _showErrorSnackBar(result.errorMessage!);
+      return;
+    }
+
+    if (result.nextStep == AuthNextStep.main) {
+      Navigator.of(context).pushReplacementNamed('/main');
+    } else if (result.nextStep == AuthNextStep.onboarding) {
+      Navigator.of(context).pushReplacementNamed('/onboarding');
+    }
   }
 
-  void _handleAppleLogin(BuildContext context) {
-    // TODO: Implement Apple login
-    _navigateToHome(context);
-  }
-
-  void _navigateToHome(BuildContext context) {
-    Navigator.of(context).pushReplacementNamed('/main');
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red.shade400),
+    );
   }
 }

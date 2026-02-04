@@ -3,7 +3,11 @@ import '../theme/app_colors.dart';
 import 'home/home_screen.dart';
 import 'call/call_screen.dart';
 import 'history/history_screen.dart';
+import 'reviews/review_write_screen.dart';
+import 'reviews/reviews_screen.dart';
 import 'settings/settings_screen.dart';
+import '../viewmodels/call_session_viewmodel.dart';
+import '../widgets/call_status_indicator.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -14,31 +18,75 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
-  int _callScreenKey = 0;
-  bool _startConnecting = false;
+  final CallSessionViewModel _session = CallSessionViewModel.instance;
+  late final VoidCallback _onSessionChanged;
+  Offset? _callPipOffset;
+
+  @override
+  void initState() {
+    super.initState();
+    _onSessionChanged = () {
+      if (mounted) setState(() {});
+    };
+    _session.init();
+    _session.addListener(_onSessionChanged);
+  }
+
+  @override
+  void dispose() {
+    _session.removeListener(_onSessionChanged);
+    super.dispose();
+  }
 
   void _onCallPressed() {
-    setState(() {
-      _startConnecting = true;
-      _callScreenKey++; // Key 변경으로 CallScreen 리빌드
-      _currentIndex = 1; // 통화 탭으로 이동
-    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CallScreen(
+          startConnecting: true,
+          onCallEnded: _goToReviewWrite,
+        ),
+      ),
+    );
+  }
+
+  void _goToReviews() {
+    if (mounted) {
+      setState(() {
+        _currentIndex = 1;
+      });
+    }
+  }
+
+  void _goToReviewWrite() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReviewWriteScreen(onDone: _goToReviews),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          HomeScreen(onCallPressed: _onCallPressed),
-          CallScreen(
-            key: ValueKey(_callScreenKey),
-            startConnecting: _startConnecting,
-          ),
-          const HistoryScreen(),
-          const SettingsScreen(),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              IndexedStack(
+                index: _currentIndex,
+                children: [
+                  HomeScreen(onCallPressed: _onCallPressed),
+                  const ReviewsScreen(),
+                  const HistoryScreen(),
+                  const SettingsScreen(),
+                ],
+              ),
+              if (_session.status != CallStatus.ended)
+                _buildCallPip(context, constraints),
+            ],
+          );
+        },
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -54,11 +102,6 @@ class _MainNavigationState extends State<MainNavigation> {
           currentIndex: _currentIndex,
           onTap: (index) {
             setState(() {
-              // 통화 탭 직접 클릭 시 연결 시작 안함
-              if (index == 1) {
-                _startConnecting = false;
-                _callScreenKey++;
-              }
               _currentIndex = index;
             });
           },
@@ -78,13 +121,13 @@ class _MainNavigationState extends State<MainNavigation> {
               label: '홈',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.phone_outlined),
-              activeIcon: Icon(Icons.phone),
-              label: '통화',
+              icon: Icon(Icons.rate_review_outlined),
+              activeIcon: Icon(Icons.rate_review),
+              label: '리뷰',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.history_outlined),
-              activeIcon: Icon(Icons.history),
+              icon: Icon(Icons.location_on_outlined),
+              activeIcon: Icon(Icons.location_on),
               label: '히스토리',
             ),
             BottomNavigationBarItem(
@@ -93,6 +136,139 @@ class _MainNavigationState extends State<MainNavigation> {
               label: '설정',
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCallPip(BuildContext context, BoxConstraints constraints) {
+    const margin = 16.0;
+    const pipMinHeight = 64.0;
+
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final isConnecting = _session.status == CallStatus.connecting;
+    final isOnCall = _session.status == CallStatus.onCall;
+    final label = isConnecting
+        ? '연결 중...'
+        : (isOnCall ? '통화 중' : '통화 대기');
+
+    final availableWidth = constraints.maxWidth - (margin * 2);
+    final pipWidth = availableWidth.clamp(240.0, 360.0);
+
+    final reservedBottom = bottomPadding + 72.0;
+    final minX = margin;
+    final maxX = (constraints.maxWidth - pipWidth - margin).clamp(minX, 1e9);
+    final minY = margin;
+    final maxY = (constraints.maxHeight - pipMinHeight - reservedBottom)
+        .clamp(minY, 1e9);
+
+    final defaultOffset = Offset(minX, maxY);
+    _callPipOffset ??= defaultOffset;
+
+    final effectiveOffset = Offset(
+      _callPipOffset!.dx.clamp(minX, maxX),
+      _callPipOffset!.dy.clamp(minY, maxY),
+    );
+
+    if (effectiveOffset != _callPipOffset) {
+      _callPipOffset = effectiveOffset;
+    }
+
+    return Positioned(
+      left: effectiveOffset.dx,
+      top: effectiveOffset.dy,
+      child: Material(
+        color: Colors.transparent,
+        child: GestureDetector(
+          onPanUpdate: (details) {
+            final next = Offset(
+              (_callPipOffset!.dx + details.delta.dx).clamp(minX, maxX),
+              (_callPipOffset!.dy + details.delta.dy).clamp(minY, maxY),
+            );
+            setState(() {
+              _callPipOffset = next;
+            });
+          },
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: pipWidth, maxWidth: pipWidth),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.secondary,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isOnCall ? AppColors.onCall : AppColors.connecting,
+                    ),
+                    child: const Icon(Icons.call, color: Colors.white, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (isOnCall)
+                          Text(
+                            _session.formattedDuration,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '복귀',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CallScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.open_in_full, color: Colors.white),
+                  ),
+                  IconButton(
+                    tooltip: isConnecting ? '취소' : '종료',
+                    onPressed: () async {
+                      if (isConnecting) {
+                        await _session.endCall();
+                        return;
+                      }
+                      await _session.endCall();
+                      _goToReviewWrite();
+                    },
+                    icon: Icon(
+                      isConnecting ? Icons.close : Icons.call_end,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

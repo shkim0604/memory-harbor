@@ -3,107 +3,185 @@ import '../../theme/app_colors.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import 'history_detail_screen.dart';
+import '../../viewmodels/history_viewmodel.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
   @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  final HistoryViewModel _viewModel = HistoryViewModel();
+
+  @override
+  void initState() {
+    super.initState();
+    _viewModel.init(onChanged: () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _viewModel.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_viewModel.status == HistoryStatus.unauthenticated) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: Text('로그인이 필요합니다')),
+      );
+    }
+
+    if (_viewModel.status == HistoryStatus.noGroup) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: Text('아직 그룹에 속해 있지 않습니다')),
+      );
+    }
+
+    if (_viewModel.status != HistoryStatus.ready) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final receiver = _viewModel.receiver;
+    final group = _viewModel.group;
+    if (receiver == null || group == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: Text('정보를 불러오는 중...')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // AppBar
-          SliverAppBar(
-            expandedHeight: 140,
-            floating: false,
-            pinned: true,
-            backgroundColor: AppColors.secondary,
-            flexibleSpace: FlexibleSpaceBar(
-              title: const Text(
-                '추억 히스토리',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.secondary, AppColors.secondaryLight],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 50),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          image: DecorationImage(
-                            image: AssetImage(
-                              MockData.careReceiver.profileImage,
-                            ),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              MockData.careReceiver.name,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '총 ${MockData.group.stats.totalCalls}회 통화 · ${MockData.residences.length}개 시대',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // 시대별 거주지 카드 목록
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final residence = MockData.residences[index];
-                return _buildResidenceCard(context, residence);
-              }, childCount: MockData.residences.length),
-            ),
-          ),
-        ],
-      ),
+      body: _buildHistoryBody(receiver, group.stats, _viewModel.statsList),
     );
   }
 
-  Widget _buildResidenceCard(BuildContext context, Residence residence) {
+  Widget _buildHistoryBody(
+    CareReceiver receiver,
+    GroupStats groupStats,
+    List<ResidenceStats> statsList,
+  ) {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 140,
+          floating: false,
+          pinned: true,
+          backgroundColor: AppColors.secondary,
+          flexibleSpace: FlexibleSpaceBar(
+            title: const Text(
+              '추억 히스토리',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            background: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.secondary, AppColors.secondaryLight],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 60, 20, 50),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
+                        image: receiver.profileImage.isNotEmpty
+                            ? DecorationImage(
+                                image: receiver.profileImage.startsWith('assets/')
+                                    ? AssetImage(receiver.profileImage)
+                                        as ImageProvider
+                                    : NetworkImage(receiver.profileImage),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: receiver.profileImage.isEmpty
+                          ? const Icon(Icons.person, color: Colors.white)
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            receiver.name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '총 ${groupStats.totalCalls}회 통화 · ${statsList.length}개 시대',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final stats = statsList[index];
+              final residence = Residence(
+                residenceId: stats.residenceId,
+                era: stats.era,
+                location: stats.location,
+                detail: stats.detail,
+              );
+              return _buildResidenceCard(
+                context,
+                residence,
+                stats,
+                receiver.receiverId,
+              );
+            }, childCount: statsList.length),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResidenceCard(
+    BuildContext context,
+    Residence residence,
+    ResidenceStats? residenceStats,
+    String receiverId,
+  ) {
     final residenceUi = MockData.getResidenceUi(residence);
-    final residenceStats = MockData.getResidenceStats(residence);
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -115,6 +193,8 @@ class HistoryScreen extends StatelessWidget {
               location: residence.location,
               detail: residence.detail,
               color: residenceUi.color,
+              receiverId: receiverId,
+              residenceStats: residenceStats,
             ),
           ),
         );
@@ -203,6 +283,19 @@ class HistoryScreen extends StatelessWidget {
                             color: AppColors.textSecondary,
                           ),
                         ),
+                        if ((residenceStats?.aiSummary ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            residenceStats!.aiSummary,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.4,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
