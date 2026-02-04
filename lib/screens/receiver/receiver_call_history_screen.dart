@@ -39,9 +39,13 @@ class _ReceiverCallHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateText = _formatDate(call.startedAt);
-    final durationText = _formatDuration(call.durationSec);
+    final durationText = _formatDurationFromCall(call);
     final name =
         call.giverNameSnapshot.isNotEmpty ? call.giverNameSnapshot : '통화 상대';
+    final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
+    final icon = isCompleted ? Icons.call : Icons.phone_missed;
+    final iconColor = AppColors.primary;
+    final bubbleColor = AppColors.primaryLight.withValues(alpha: 0.35);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -63,9 +67,9 @@ class _ReceiverCallHistoryCard extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryLight.withValues(alpha: 0.35),
+              color: bubbleColor,
             ),
-            child: const Icon(Icons.call, color: AppColors.primary),
+            child: Icon(icon, color: iconColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -113,11 +117,21 @@ class _ReceiverCallHistoryCard extends StatelessWidget {
     return '$year.$month.$day $hour:$minute';
   }
 
-  String _formatDuration(int? seconds) {
-    if (seconds == null || seconds <= 0) return '0분';
+  String _formatDurationFromCall(Call call) {
+    final seconds = _durationSeconds(call);
+    if (seconds <= 0) return '0초';
     final minutes = seconds ~/ 60;
     final remain = seconds % 60;
-    if (minutes <= 0) return '${remain}초';
+    if (minutes <= 0) return '${seconds}초';
     return remain == 0 ? '${minutes}분' : '${minutes}분 ${remain}초';
+  }
+
+  int _durationSeconds(Call call) {
+    final raw = call.durationSec ?? 0;
+    if (raw > 0) return raw;
+    final endedAt = call.endedAt;
+    if (endedAt == null) return 0;
+    final diff = endedAt.difference(call.startedAt).inSeconds;
+    return diff > 0 ? diff : 0;
   }
 }

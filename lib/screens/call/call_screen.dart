@@ -89,7 +89,6 @@ class _CallScreenState extends State<CallScreen> {
         _maybeAutoStart();
       }
     }
-
   }
 
   @override
@@ -139,8 +138,9 @@ class _CallScreenState extends State<CallScreen> {
       }
       _activeCallId = invite.callId;
       _attachCallStatusListener(invite.callId);
-      channelName =
-          invite.channelName.isNotEmpty ? invite.channelName : invite.callId;
+      channelName = invite.channelName.isNotEmpty
+          ? invite.channelName
+          : invite.callId;
     }
 
     await _session.startCall(
@@ -262,9 +262,9 @@ class _CallScreenState extends State<CallScreen> {
 
   void _attachCallStatusListener(String callId) {
     _callStatusSub?.cancel();
-    _callStatusSub = CallService.instance
-        .streamCallDoc(callId)
-        .listen((snapshot) async {
+    _callStatusSub = CallService.instance.streamCallDoc(callId).listen((
+      snapshot,
+    ) async {
       final data = snapshot.data();
       if (data == null) return;
       final status = (data['status'] ?? '') as String;

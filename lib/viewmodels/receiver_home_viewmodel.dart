@@ -82,13 +82,15 @@ class ReceiverHomeViewModel {
 
   int get totalCompletedCalls => completedCalls.length;
 
+  List<Call> get displayCalls => calls;
+
   List<Call> visibleCalls(int maxCount) {
     if (maxCount <= 0) return const [];
-    return completedCalls.take(maxCount).toList();
+    return displayCalls.take(maxCount).toList();
   }
 
   bool hasMoreCalls(int maxCount) {
     if (maxCount <= 0) return calls.isNotEmpty;
-    return completedCalls.length > maxCount;
+    return displayCalls.length > maxCount;
   }
 }

@@ -444,9 +444,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMyCallCard(Call call) {
-    final summary = call.humanSummary.isNotEmpty
-        ? call.humanSummary
-        : call.humanNotes;
+    final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
+    final icon = isCompleted ? Icons.call : Icons.phone_missed;
+    final name =
+        call.receiverNameSnapshot.isNotEmpty ? call.receiverNameSnapshot : '통화 상대';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -460,47 +461,47 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatDateTime(call.startedAt),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.accentLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _formatDuration(call.durationSec),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primaryLight.withValues(alpha: 0.35),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.accentDark,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            summary,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              height: 1.4,
+                const SizedBox(height: 4),
+                Text(
+                  _formatDateTime(call.startedAt),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            _formatDurationFromCall(call),
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -530,6 +531,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final summary = call.humanSummary.isNotEmpty
         ? call.humanSummary
         : call.humanNotes;
+    final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
+    final icon = isCompleted ? Icons.call : Icons.phone_missed;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -557,6 +560,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Row(
                         children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primaryLight
+                                  .withValues(alpha: 0.35),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: AppColors.primary,
+                              size: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             call.giverNameSnapshot,
                             style: const TextStyle(
@@ -589,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        _formatDuration(call.durationSec),
+                        _formatDurationFromCall(call),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -627,11 +645,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$date  $time';
   }
 
-  String _formatDuration(int? seconds) {
-    if (seconds == null) return '';
+  String _formatDurationFromCall(Call call) {
+    final seconds = _durationSeconds(call);
+    if (seconds <= 0) return '0초';
     final duration = Duration(seconds: seconds);
     final totalMinutes = duration.inMinutes;
     if (totalMinutes < 60) {
+      if (totalMinutes <= 0) return '${seconds}초';
       return '${totalMinutes}분';
     }
     final hours = duration.inHours;
@@ -640,6 +660,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return '${hours}시간';
     }
     return '${hours}시간 ${minutes}분';
+  }
+
+  int _durationSeconds(Call call) {
+    final raw = call.durationSec ?? 0;
+    if (raw > 0) return raw;
+    final endedAt = call.endedAt;
+    if (endedAt == null) return 0;
+    final diff = endedAt.difference(call.startedAt).inSeconds;
+    return diff > 0 ? diff : 0;
   }
 
   Widget _buildEmptyListMessage(String message) {

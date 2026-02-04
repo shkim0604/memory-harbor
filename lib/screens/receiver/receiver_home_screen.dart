@@ -71,13 +71,32 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
       children: [
         _buildHeader(group),
         const SizedBox(height: 12),
+        _buildRecentTitle(),
+        const SizedBox(height: 8),
         Expanded(child: _buildCallList(calls)),
       ],
     );
   }
 
+  Widget _buildRecentTitle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          '최근 통화 내역',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(Group group) {
-    final memberCount = group.careGiverUserIds.length + 1;
+    final memberCount = group.careGiverUserIds.length;
     final totalCalls = _viewModel.totalCompletedCalls;
     final thisWeek = _viewModel.thisWeekCalls;
 
@@ -250,7 +269,11 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
 
   Widget _buildCallCard(Call call) {
     final dateText = _formatDate(call.startedAt);
-    final durationText = _formatDuration(call.durationSec);
+    final durationText = _formatDurationFromCall(call);
+    final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
+    final icon = isCompleted ? Icons.call : Icons.phone_missed;
+    final iconColor = AppColors.primary;
+    final bubbleColor = AppColors.primaryLight.withValues(alpha: 0.35);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -272,9 +295,9 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primaryLight.withValues(alpha: 0.35),
+              color: bubbleColor,
             ),
-            child: const Icon(Icons.call, color: AppColors.primary),
+            child: Icon(icon, color: iconColor),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -324,11 +347,21 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
     return '$year.$month.$day $hour:$minute';
   }
 
-  String _formatDuration(int? seconds) {
-    if (seconds == null || seconds <= 0) return '0분';
+  String _formatDurationFromCall(Call call) {
+    final seconds = _durationSeconds(call);
+    if (seconds <= 0) return '0초';
     final minutes = seconds ~/ 60;
     final remain = seconds % 60;
-    if (minutes <= 0) return '${remain}초';
+    if (minutes <= 0) return '${seconds}초';
     return remain == 0 ? '${minutes}분' : '${minutes}분 ${remain}초';
+  }
+
+  int _durationSeconds(Call call) {
+    final raw = call.durationSec ?? 0;
+    if (raw > 0) return raw;
+    final endedAt = call.endedAt;
+    if (endedAt == null) return 0;
+    final diff = endedAt.difference(call.startedAt).inSeconds;
+    return diff > 0 ? diff : 0;
   }
 }

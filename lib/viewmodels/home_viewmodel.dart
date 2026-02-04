@@ -134,10 +134,7 @@ class HomeViewModel {
   }
 
   List<Call> get communityCalls {
-    if (firebaseUser == null) return const [];
-    return calls
-        .where((call) => call.caregiverUserId != firebaseUser!.uid)
-        .toList();
+    return completedCalls;
   }
 
   List<Call> get sortedMyCalls => _sortCallsDesc(myCalls);
