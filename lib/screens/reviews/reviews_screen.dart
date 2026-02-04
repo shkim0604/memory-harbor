@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/reviews_viewmodel.dart';
+import '../../utils/time_utils.dart';
 
 class ReviewsScreen extends StatefulWidget {
   const ReviewsScreen({super.key});
@@ -202,8 +203,9 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   }
 
   String _formatDate(DateTime dateTime) {
-    final month = dateTime.month.toString().padLeft(2, '0');
-    final day = dateTime.day.toString().padLeft(2, '0');
-    return '${dateTime.year}.$month.$day';
+    final et = TimeUtils.toEt(dateTime);
+    final month = et.month.toString().padLeft(2, '0');
+    final day = et.day.toString().padLeft(2, '0');
+    return '${et.year}.$month.$day';
   }
 }

@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/call_session_viewmodel.dart';
 import '../../services/call_invite_service.dart';
 import '../../services/call_notification_service.dart';
 import '../../widgets/call_status_indicator.dart';
+import '../../services/call_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ReceiverCallScreen extends StatefulWidget {
   final CallInvitePayload? payload;
@@ -25,6 +29,8 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   bool _accepted = false;
   bool _starting = false;
   bool _ending = false;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callStatusSub;
+  bool _actionLocked = false;
 
   @override
   void initState() {
@@ -43,10 +49,16 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     if (widget.autoStart) {
       _startCall();
     }
+
+    final callId = widget.payload?.callId ?? '';
+    if (callId.isNotEmpty) {
+      _attachCallStatusListener(callId);
+    }
   }
 
   @override
   void dispose() {
+    _callStatusSub?.cancel();
     _session.removeListener(_onSessionChanged);
     super.dispose();
   }
@@ -91,7 +103,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
           Text(
             name,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
@@ -117,7 +129,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
         child: Text(
           initial,
           style: const TextStyle(
-            fontSize: 42,
+            fontSize: 46,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -136,7 +148,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     return Text(
       statusText,
       style: TextStyle(
-        fontSize: 16,
+        fontSize: 18,
         color: Colors.white.withValues(alpha: 0.85),
       ),
     );
@@ -197,7 +209,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
             icon: Icons.call_end,
             label: '통화 종료',
             onPressed: _endCall,
-            size: 70,
+            size: 76,
           ),
         ],
       ),
@@ -214,7 +226,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     return Column(
       children: [
         GestureDetector(
-          onTap: onPressed,
+          onTap: _actionLocked ? null : onPressed,
           child: Container(
             width: size,
             height: size,
@@ -236,7 +248,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 16,
             color: Colors.white.withValues(alpha: 0.8),
           ),
         ),
@@ -278,7 +290,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 14,
                 color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
@@ -289,21 +301,27 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   }
 
   Future<void> _acceptCall() async {
-    if (_starting || _accepted) return;
+    if (_starting || _accepted || _actionLocked) return;
     final payload = widget.payload;
     if (payload == null || payload.callId.isEmpty) return;
     _starting = true;
-    await CallInviteService.instance
-        .answerCall(callId: payload.callId, action: 'accept');
-    _accepted = true;
-    if (mounted) setState(() {});
-    await _startCall();
-    _starting = false;
+    _actionLocked = true;
+    try {
+      await CallInviteService.instance
+          .answerCall(callId: payload.callId, action: 'accept');
+      _accepted = true;
+      if (mounted) setState(() {});
+      await _startCall();
+    } finally {
+      _starting = false;
+      _actionLocked = false;
+    }
   }
 
   Future<void> _declineCall() async {
-    if (_ending) return;
+    if (_ending || _actionLocked) return;
     _ending = true;
+    _actionLocked = true;
     final payload = widget.payload;
     if (payload != null && payload.callId.isNotEmpty) {
       await CallInviteService.instance
@@ -313,11 +331,19 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
     _ending = false;
+    _actionLocked = false;
   }
 
   Future<void> _startCall() async {
     final payload = widget.payload;
-    if (payload == null || payload.channelName.isEmpty) {
+    if (payload == null) {
+      _showError('채널 정보를 찾을 수 없습니다');
+      return;
+    }
+    final channelName = payload.channelName.isNotEmpty
+        ? payload.channelName
+        : payload.callId;
+    if (channelName.isEmpty) {
       _showError('채널 정보를 찾을 수 없습니다');
       return;
     }
@@ -325,12 +351,37 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     await _session.startCall(
       context,
       groupId: payload.groupId,
-      channelName: payload.channelName,
+      channelName: channelName,
+      callerUserId: payload.callerId,
+      peerUserId: payload.receiverId,
+      callId: payload.callId,
     );
   }
 
   Future<void> _endCall() async {
-    await _session.endCall();
+    if (_actionLocked) return;
+    _actionLocked = true;
+    try {
+      await _session.endCall();
+    } finally {
+      _actionLocked = false;
+    }
+  }
+
+  void _attachCallStatusListener(String callId) {
+    _callStatusSub?.cancel();
+    _callStatusSub =
+        CallService.instance.streamCallDoc(callId).listen((snapshot) async {
+      final data = snapshot.data();
+      if (data == null) return;
+      final status = (data['status'] ?? '') as String;
+      if (status == 'missed' || status == 'declined' || status == 'cancelled') {
+        await _session.endCall();
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      }
+    });
   }
 
   void _showError(String message) {

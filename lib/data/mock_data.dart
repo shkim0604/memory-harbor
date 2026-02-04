@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../utils/time_utils.dart';
 
 class ResidenceUiMeta {
   final IconData icon;
@@ -591,11 +592,13 @@ class MockData {
   static int get connectedPeople => group.careGiverUserIds.length;
 
   static String formatDate(DateTime dateTime) {
-    return '${dateTime.year}.${_two(dateTime.month)}.${_two(dateTime.day)}';
+    final et = TimeUtils.toEt(dateTime);
+    return '${et.year}.${_two(et.month)}.${_two(et.day)}';
   }
 
   static String formatTime(DateTime dateTime) {
-    return '${_two(dateTime.hour)}:${_two(dateTime.minute)}';
+    final et = TimeUtils.toEt(dateTime);
+    return '${_two(et.hour)}:${_two(et.minute)}';
   }
 
   static String formatDuration(int? seconds) {

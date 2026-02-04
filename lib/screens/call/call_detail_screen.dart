@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../viewmodels/call_detail_viewmodel.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/time_utils.dart';
 
 class CallDetailScreen extends StatefulWidget {
   final String residenceId;
@@ -738,8 +739,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
         : '알 수 없음';
     final caregiverInitial =
         caregiverName.isNotEmpty ? caregiverName[0] : '?';
-    final dateText =
-        '${call.startedAt.year}.${call.startedAt.month.toString().padLeft(2, '0')}.${call.startedAt.day.toString().padLeft(2, '0')}';
+    final dateText = _formatDate(call.startedAt);
     final durationText = _formatDuration(call.durationSec);
 
     return AnimatedBuilder(
@@ -899,5 +899,10 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       return '${hours}시간';
     }
     return '${hours}시간 ${minutes}분';
+  }
+
+  String _formatDate(DateTime dateTime) {
+    final et = TimeUtils.toEt(dateTime);
+    return '${et.year}.${et.month.toString().padLeft(2, '0')}.${et.day.toString().padLeft(2, '0')}';
   }
 }

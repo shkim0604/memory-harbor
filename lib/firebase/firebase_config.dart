@@ -9,17 +9,17 @@ import 'firebase_options_dev.dart' as dev;
 import 'firebase_options_prod.dart' as prod;
 import '../services/seed_service.dart';
 
-enum AppEnv { dev, prod }
+enum AppEnv { emul, dev, prod }
 
 class FirebaseConfig {
   FirebaseConfig._();
 
   static const String _env = String.fromEnvironment('ENV', defaultValue: 'dev');
 
-  // Emulator enabled by default for dev
+  // Emulator enabled by default for emul environment.
   static const bool _useEmulator = bool.fromEnvironment(
     'USE_EMULATOR',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   // Override emulator host for physical devices (e.g. '192.168.0.12').
@@ -31,13 +31,25 @@ class FirebaseConfig {
     defaultValue: '',
   );
 
-  static AppEnv get env => _env == 'prod' ? AppEnv.prod : AppEnv.dev;
+  static AppEnv get env {
+    if (_env == 'prod') return AppEnv.prod;
+    if (_env == 'emul') return AppEnv.emul;
+    return AppEnv.dev;
+  }
 
-  static bool get useEmulator => env == AppEnv.dev && _useEmulator;
+  static bool get useEmulator =>
+      env == AppEnv.emul || (env == AppEnv.dev && _useEmulator);
 
-  static FirebaseOptions get options => env == AppEnv.prod
-      ? prod.DefaultFirebaseOptionsProd.currentPlatform
-      : dev.DefaultFirebaseOptionsDev.currentPlatform;
+  static FirebaseOptions get options {
+    if (env == AppEnv.prod) {
+      return prod.DefaultFirebaseOptionsProd.currentPlatform;
+    }
+    if (env == AppEnv.emul) {
+      return dev.DefaultFirebaseOptionsDev.currentPlatform;
+    }
+    // Dev now uses the real Firebase project (former prod).
+    return prod.DefaultFirebaseOptionsProd.currentPlatform;
+  }
 
   static Future<void> initialize() async {
     await Firebase.initializeApp(options: options);

@@ -6,6 +6,7 @@ import '../services/call_service.dart';
 import '../services/care_receiver_service.dart';
 import '../services/group_service.dart';
 import '../services/user_service.dart';
+import '../utils/time_utils.dart';
 
 enum HomeStatus {
   unauthenticated,
@@ -143,9 +144,15 @@ class HomeViewModel {
 
   List<Call> get sortedCommunityCalls => _sortCallsDesc(communityCalls);
 
+  List<Call> get completedCalls => calls
+      .where((call) => call.endedAt != null && (call.durationSec ?? 0) > 0)
+      .toList();
+
+  int get totalCompletedCalls => completedCalls.length;
+
   int get thisWeekCalls {
-    final now = DateTime.now();
-    return calls
+    final now = TimeUtils.nowEt();
+    return completedCalls
         .where(
           (call) =>
               call.startedAt.isAfter(now.subtract(const Duration(days: 7))),

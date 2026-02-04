@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user.dart';
+import '../utils/time_utils.dart';
 
 class UserService {
   UserService._();
@@ -53,7 +54,7 @@ class UserService {
     required String email,
     String? profileImage,
   }) async {
-    final now = DateTime.now();
+    final now = TimeUtils.nowEt();
     final user = AppUser(
       uid: uid,
       name: name,
@@ -74,7 +75,7 @@ class UserService {
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     await _usersCollection.doc(uid).update({
       ...data,
-      'lastActivityAt': DateTime.now().toIso8601String(),
+      'lastActivityAt': TimeUtils.nowEt().toIso8601String(),
     });
   }
 

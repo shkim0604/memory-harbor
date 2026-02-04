@@ -10,6 +10,7 @@ import 'theme/app_colors.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/main_navigation.dart';
+import 'utils/time_utils.dart';
 
 // Global navigator for push/callkit routing.
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -23,6 +24,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  TimeUtils.initialize();
   await FirebaseConfig.initialize();
   // FCM background handler must be registered before runApp.
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

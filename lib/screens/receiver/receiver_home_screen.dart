@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/receiver_home_viewmodel.dart';
+import '../../utils/time_utils.dart';
+import 'receiver_call_history_screen.dart';
 
 class ReceiverHomeScreen extends StatefulWidget {
   const ReceiverHomeScreen({super.key});
@@ -76,7 +78,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
 
   Widget _buildHeader(Group group) {
     final memberCount = group.careGiverUserIds.length + 1;
-    final totalCalls = group.stats.totalCalls;
+    final totalCalls = _viewModel.totalCompletedCalls;
     final thisWeek = _viewModel.thisWeekCalls;
 
     return Container(
@@ -87,7 +89,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           Text(
             group.name,
             style: const TextStyle(
-              fontSize: 22,
+              fontSize: 26,
               fontWeight: FontWeight.bold,
               color: AppColors.secondary,
             ),
@@ -96,7 +98,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           Text(
             '공동체 멤버 ${memberCount}명',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 18,
               color: AppColors.textSecondary,
             ),
           ),
@@ -152,7 +154,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 16,
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
             ),
@@ -161,7 +163,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               color: accent,
             ),
@@ -170,7 +172,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 16,
               color: AppColors.textHint,
             ),
           ),
@@ -184,19 +186,65 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
       return Center(
         child: Text(
           '아직 통화 기록이 없습니다',
-          style: TextStyle(color: AppColors.textHint),
+          style: TextStyle(color: AppColors.textHint, fontSize: 18),
         ),
       );
     }
+    final maxVisible = _maxVisibleCount(context);
+    final visibleCalls = _viewModel.visibleCalls(maxVisible);
+    final hasMore = _viewModel.hasMoreCalls(maxVisible);
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-      itemCount: calls.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final call = calls[index];
-        return _buildCallCard(call);
-      },
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            itemCount: visibleCalls.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final call = visibleCalls[index];
+              return _buildCallCard(call);
+            },
+          ),
+        ),
+        if (hasMore)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _openAllCalls(context, calls),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  '전체보기',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  int _maxVisibleCount(BuildContext context) {
+    final height = MediaQuery.of(context).size.height;
+    if (height < 700) return 2;
+    if (height < 820) return 3;
+    return 4;
+  }
+
+  void _openAllCalls(BuildContext context, List<Call> calls) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceiverCallHistoryScreen(calls: calls),
+      ),
     );
   }
 
@@ -238,7 +286,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
                       ? call.giverNameSnapshot
                       : '통화 상대',
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -247,7 +295,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
                 Text(
                   dateText,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 16,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -257,7 +305,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           Text(
             durationText,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 16,
               color: AppColors.textSecondary,
             ),
           ),
@@ -267,11 +315,12 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
   }
 
   String _formatDate(DateTime date) {
-    final year = date.year.toString();
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
+    final et = TimeUtils.toEt(date);
+    final year = et.year.toString();
+    final month = et.month.toString().padLeft(2, '0');
+    final day = et.day.toString().padLeft(2, '0');
+    final hour = et.hour.toString().padLeft(2, '0');
+    final minute = et.minute.toString().padLeft(2, '0');
     return '$year.$month.$day $hour:$minute';
   }
 

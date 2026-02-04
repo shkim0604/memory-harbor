@@ -80,9 +80,9 @@ class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
           unselectedItemColor: AppColors.textHint,
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: 12,
+            fontSize: 14,
           ),
-          unselectedLabelStyle: const TextStyle(fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontSize: 14),
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),

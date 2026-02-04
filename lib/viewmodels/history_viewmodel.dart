@@ -5,6 +5,8 @@ import '../models/models.dart';
 import '../services/care_receiver_service.dart';
 import '../services/group_service.dart';
 import '../services/user_service.dart';
+import '../services/call_service.dart';
+import '../utils/time_utils.dart';
 
 enum HistoryStatus {
   unauthenticated,
@@ -22,12 +24,14 @@ class HistoryViewModel {
   Group? group;
   CareReceiver? receiver;
   List<ResidenceStats> statsList = const [];
+  List<Call> calls = const [];
 
   StreamSubscription<AppUser?>? _userSub;
   StreamSubscription<Group?>? _groupSub;
   StreamSubscription<Group?>? _receiverGroupSub;
   StreamSubscription<CareReceiver?>? _receiverSub;
   StreamSubscription<List<ResidenceStats>>? _statsSub;
+  StreamSubscription<List<Call>>? _callsSub;
 
   void init({required void Function() onChanged}) {
     firebaseUser = FirebaseAuth.instance.currentUser;
@@ -44,8 +48,8 @@ class HistoryViewModel {
         .streamUser(firebaseUser!.uid)
         .listen((nextUser) {
       if (nextUser == null) {
-        status = HistoryStatus.loadingUser;
-        onChanged();
+        // Receiver accounts may not have a user document.
+        _subscribeGroupByReceiver(firebaseUser!.uid, onChanged);
         return;
       }
 
@@ -64,6 +68,7 @@ class HistoryViewModel {
     _receiverGroupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
+    _callsSub?.cancel();
   }
 
   void _subscribeGroup(String groupId, void Function() onChanged) {
@@ -121,6 +126,7 @@ class HistoryViewModel {
       }
 
       _subscribeResidenceStats(nextReceiver.receiverId, onChanged);
+      _subscribeCalls(nextReceiver.receiverId, onChanged);
     });
   }
 
@@ -138,13 +144,43 @@ class HistoryViewModel {
     });
   }
 
+  void _subscribeCalls(String receiverId, void Function() onChanged) {
+    _callsSub?.cancel();
+    _callsSub = CallService.instance
+        .streamCallsByReceiver(receiverId)
+        .listen((nextCalls) {
+      calls = nextCalls;
+      if (status == HistoryStatus.ready) {
+        onChanged();
+      }
+    });
+  }
+
   void _clearGroupState() {
     group = null;
     receiver = null;
     statsList = const [];
+    calls = const [];
     _groupSub?.cancel();
     _receiverGroupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
+    _callsSub?.cancel();
+  }
+
+  List<Call> get completedCalls => calls
+      .where((call) => call.endedAt != null && (call.durationSec ?? 0) > 0)
+      .toList();
+
+  int get totalCompletedCalls => completedCalls.length;
+
+  int get thisWeekCalls {
+    final now = TimeUtils.nowEt();
+    return completedCalls
+        .where(
+          (call) =>
+              call.startedAt.isAfter(now.subtract(const Duration(days: 7))),
+        )
+        .length;
   }
 }

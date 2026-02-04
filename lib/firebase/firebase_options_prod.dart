@@ -63,6 +63,7 @@ class DefaultFirebaseOptionsProd {
     messagingSenderId: '498442703852',
     projectId: 'memory-harbor',
     storageBucket: 'memory-harbor.firebasestorage.app',
+    iosClientId: '498442703852-3dn62mfnfvlb38j27qbouq2t8p32bsrr.apps.googleusercontent.com',
     iosBundleId: 'org.delighthouse.memory-harbor',
   );
 }

@@ -63,13 +63,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: _buildHistoryBody(receiver, group.stats, _viewModel.statsList),
+      body: _buildHistoryBody(
+        receiver,
+        _viewModel.totalCompletedCalls,
+        _viewModel.statsList,
+      ),
     );
   }
 
   Widget _buildHistoryBody(
     CareReceiver receiver,
-    GroupStats groupStats,
+    int totalCalls,
     List<ResidenceStats> statsList,
   ) {
     return CustomScrollView(
@@ -136,7 +140,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '총 ${groupStats.totalCalls}회 통화 · ${statsList.length}개 시대',
+                            '총 ${totalCalls}회 통화 · ${statsList.length}개 시대',
                             style: const TextStyle(
                               fontSize: 13,
                               color: Colors.white70,

@@ -392,6 +392,10 @@ class AgoraService {
     required String apiBaseUrl,
     required String channelName,
     required int uid,
+    String? token,
+    String? groupId,
+    String? callerId,
+    String? receiverId,
   }) async {
     try {
       final uri = Uri.parse('$apiBaseUrl/api/recording/start');
@@ -399,7 +403,15 @@ class AgoraService {
       final request = await client.postUrl(uri);
       request.headers.contentType = ContentType.json;
       request.write(
-        jsonEncode(<String, dynamic>{'channel': channelName, 'uid': uid}),
+        jsonEncode(<String, dynamic>{
+          'channel': channelName,
+          if (token != null && token.isNotEmpty) 'token': token,
+          'uid': uid,
+          if (groupId != null && groupId.isNotEmpty) 'group_id': groupId,
+          if (callerId != null && callerId.isNotEmpty) 'caller_id': callerId,
+          if (receiverId != null && receiverId.isNotEmpty)
+            'receiver_id': receiverId,
+        }),
       );
       final response = await request.close();
       await response.transform(utf8.decoder).join();

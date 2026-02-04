@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../config/agora_config.dart';
 import '../services/agora_service.dart';
 import '../services/permission_service.dart';
+import '../services/call_invite_service.dart';
 import '../widgets/call_status_indicator.dart';
 
 class CallSessionViewModel {
@@ -22,7 +23,11 @@ class CallSessionViewModel {
   final String _agoraAppId = AgoraConfig.appId;
   String? currentChannelName;
   String? currentGroupId;
+  String? currentCallId;
   int? currentUid;
+  String? currentCallerId;
+  String? currentReceiverId;
+  String? currentToken;
 
   Timer? _callTimer;
   bool _isEnding = false;
@@ -71,6 +76,7 @@ class CallSessionViewModel {
     String? channelName,
     String? callerUserId,
     String? peerUserId,
+    String? callId,
     String? token,
     int? uid,
   }) async {
@@ -112,16 +118,8 @@ class CallSessionViewModel {
     if (channelName != null && channelName.isNotEmpty) {
       nextChannelName = channelName;
     } else if (groupId != null && groupId.isNotEmpty) {
-      final trimmedCaller = callerUserId?.trim() ?? '';
-      final trimmedPeer = peerUserId?.trim() ?? '';
-      if (trimmedCaller.isNotEmpty && trimmedPeer.isNotEmpty) {
-        nextChannelName = '${groupId}_$trimmedCaller' '_$trimmedPeer';
-      } else if (trimmedCaller.isNotEmpty) {
-        nextChannelName = '${groupId}_$trimmedCaller' '_unknown';
-      } else {
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        nextChannelName = '${groupId}_$timestamp';
-      }
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      nextChannelName = '${groupId}_$timestamp';
     } else {
       nextChannelName = 'test_channel';
     }
@@ -129,7 +127,10 @@ class CallSessionViewModel {
     final nextUid = uid ?? AgoraConfig.defaultUid;
     currentChannelName = nextChannelName;
     currentGroupId = groupId;
+    currentCallId = callId;
     currentUid = nextUid;
+    currentCallerId = callerUserId;
+    currentReceiverId = peerUserId;
     String nextToken = token ?? '';
 
     if (nextToken.isEmpty && AgoraConfig.apiBaseUrl.isNotEmpty) {
@@ -140,6 +141,7 @@ class CallSessionViewModel {
       );
       nextToken = fetchedToken ?? '';
     }
+    currentToken = nextToken;
 
     final joined = await agora.joinChannel(
       channelName: nextChannelName,
@@ -159,6 +161,8 @@ class CallSessionViewModel {
   Future<void> endCall() async {
     if (_isEnding) return;
     _isEnding = true;
+    final shouldNotifyEnd = status == CallStatus.onCall;
+    final callIdToEnd = currentCallId;
     // User-initiated hangup -> stop recording immediately.
     if (isRecording) {
       await _stopServerRecording();
@@ -170,6 +174,9 @@ class CallSessionViewModel {
     _stopCallTimer();
     _syncConnectingTone();
     _notifyChanged();
+    if (shouldNotifyEnd && callIdToEnd != null && callIdToEnd.isNotEmpty) {
+      await CallInviteService.instance.endCall(callId: callIdToEnd);
+    }
     _isEnding = false;
   }
 
@@ -298,7 +305,11 @@ class CallSessionViewModel {
     return await AgoraService.instance.startServerRecording(
       apiBaseUrl: AgoraConfig.apiBaseUrl,
       channelName: channelName,
+      token: currentToken,
       uid: AgoraConfig.recordingBotUid,
+      groupId: currentGroupId,
+      callerId: currentCallerId,
+      receiverId: currentReceiverId,
     );
   }
 

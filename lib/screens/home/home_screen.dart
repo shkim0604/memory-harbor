@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../models/models.dart';
 import '../../viewmodels/home_viewmodel.dart';
 import '../../widgets/widgets.dart';
+import '../../utils/time_utils.dart';
 
 // Firebase 에서 불러오는 데이터
 // - 사용자 정보
@@ -93,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
               delegate: SliverChildListDelegate([
                 _buildCareReceiverSection(
                   receiver,
-                  group.stats,
+                  _viewModel.totalCompletedCalls,
                   _viewModel.thisWeekCalls,
                   group.careGiverUserIds.length,
                 ),
@@ -256,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // ============================================================
   Widget _buildCareReceiverSection(
     CareReceiver receiver,
-    GroupStats groupStats,
+    int totalCalls,
     int thisWeekCalls,
     int connectedPeople,
   ) {
@@ -330,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Row(
               children: [
-                _buildStatItem('총 통화', '${groupStats.totalCalls}', '회'),
+                _buildStatItem('총 통화', '$totalCalls', '회'),
                 _buildStatDivider(),
                 _buildStatItem('이번 주', '$thisWeekCalls', '회'),
                 _buildStatDivider(),
@@ -618,10 +619,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatDateTime(DateTime dateTime) {
+    final et = TimeUtils.toEt(dateTime);
     final date =
-        '${dateTime.year}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.day.toString().padLeft(2, '0')}';
+        '${et.year}.${et.month.toString().padLeft(2, '0')}.${et.day.toString().padLeft(2, '0')}';
     final time =
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+        '${et.hour.toString().padLeft(2, '0')}:${et.minute.toString().padLeft(2, '0')}';
     return '$date  $time';
   }
 

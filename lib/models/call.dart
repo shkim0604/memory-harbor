@@ -63,6 +63,7 @@ class Call {
     receiverNameSnapshot: (json['receiverNameSnapshot'] ?? '') as String,
     startedAt:
         parseDateTime(json['startedAt']) ??
+        parseDateTime(json['createdAt']) ??
         DateTime.fromMillisecondsSinceEpoch(0),
     endedAt: parseDateTime(json['endedAt']),
     durationSec: json['durationSec'] as int?,

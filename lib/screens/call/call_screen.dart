@@ -50,6 +50,7 @@ class _CallScreenState extends State<CallScreen> {
   bool _callRecorded = false;
   String? _activeCallId;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callStatusSub;
+  bool _callActionLocked = false;
 
   @override
   void initState() {
@@ -107,7 +108,8 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _startCallWithContext() async {
-    if (_autoStarted) return;
+    if (_autoStarted || _callActionLocked) return;
+    _callActionLocked = true;
     _autoStarted = true;
     _callRecorded = false;
     final groupId = widget.groupId ?? _viewModel.group?.groupId;
@@ -132,11 +134,13 @@ class _CallScreenState extends State<CallScreen> {
       if (invite == null) {
         _showErrorSnackBar('통화 요청 실패: 서버에 연결할 수 없습니다');
         _autoStarted = false;
+        _callActionLocked = false;
         return;
       }
       _activeCallId = invite.callId;
       _attachCallStatusListener(invite.callId);
-      channelName = invite.channelName;
+      channelName =
+          invite.channelName.isNotEmpty ? invite.channelName : invite.callId;
     }
 
     await _session.startCall(
@@ -145,9 +149,11 @@ class _CallScreenState extends State<CallScreen> {
       channelName: channelName,
       callerUserId: callerUserId,
       peerUserId: peerUserId,
+      callId: _activeCallId ?? widget.callId,
       token: widget.token,
       uid: widget.uid,
     );
+    _callActionLocked = false;
   }
 
   void _maybeAutoStart() {
@@ -158,6 +164,8 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Future<void> _endCall() async {
+    if (_callActionLocked) return;
+    _callActionLocked = true;
     final wasOnCall = _session.status == CallStatus.onCall;
     await _session.endCall();
     _autoStarted = false;
@@ -171,6 +179,7 @@ class _CallScreenState extends State<CallScreen> {
         Navigator.pop(context);
       }
     }
+    _callActionLocked = false;
   }
 
   Future<void> _toggleMute() async {
@@ -241,36 +250,7 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _recordCall({required bool isConfirmed}) async {
     if (_callRecorded) return;
-    final groupId = _viewModel.group?.groupId ?? _session.currentGroupId ?? '';
-    final caregiverUserId =
-        _viewModel.user?.uid ?? _viewModel.firebaseUser?.uid ?? '';
-    final receiverId = _viewModel.receiver?.receiverId ?? '';
-    if (groupId.isEmpty || caregiverUserId.isEmpty || receiverId.isEmpty) {
-      return;
-    }
-
-    final now = DateTime.now();
-    final timestamp = now.millisecondsSinceEpoch;
-    final callId = '${groupId}_${caregiverUserId}_${receiverId}_$timestamp';
-    final durationSeconds = _session.callDurationSeconds;
-    final startedAt = now.subtract(Duration(seconds: durationSeconds));
-    final channelName =
-        _session.currentChannelName ?? widget.channelName ?? callId;
-
-    await CallService.instance.createCall(
-      callId: callId,
-      channelName: channelName,
-      groupId: groupId,
-      receiverId: receiverId,
-      caregiverUserId: caregiverUserId,
-      groupNameSnapshot: _viewModel.group?.name ?? '',
-      giverNameSnapshot: _viewModel.user?.name ?? '',
-      receiverNameSnapshot: _viewModel.receiver?.name ?? '',
-      startedAt: startedAt,
-      endedAt: now,
-      durationSec: durationSeconds,
-      isConfirmed: isConfirmed,
-    );
+    // Calls are persisted by the server; client should not write to `calls`.
     _callRecorded = true;
   }
 
@@ -687,6 +667,7 @@ class _CallScreenState extends State<CallScreen> {
 
     return GestureDetector(
       onTap: () {
+        if (_callActionLocked) return;
         if (isConnecting) {
           _endCall();
           return;

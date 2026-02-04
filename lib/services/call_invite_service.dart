@@ -86,6 +86,10 @@ class CallInviteService {
     return _postJson('/api/call/missed', {'call_id': callId});
   }
 
+  Future<bool> endCall({required String callId}) async {
+    return _postJson('/api/call/end', {'call_id': callId});
+  }
+
   Future<bool> _postJson(String path, Map<String, dynamic> body) async {
     if (AgoraConfig.apiBaseUrl.trim().isEmpty) return false;
     final uri = Uri.parse('${AgoraConfig.apiBaseUrl}$path');

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 import '../services/call_service.dart';
 import '../services/group_service.dart';
+import '../utils/time_utils.dart';
 
 enum ReceiverHomeStatus {
   unauthenticated,
@@ -66,12 +67,28 @@ class ReceiverHomeViewModel {
   }
 
   int get thisWeekCalls {
-    final now = DateTime.now();
-    return calls
+    final now = TimeUtils.nowEt();
+    return completedCalls
         .where(
           (call) =>
               call.startedAt.isAfter(now.subtract(const Duration(days: 7))),
         )
         .length;
+  }
+
+  List<Call> get completedCalls => calls
+      .where((call) => call.endedAt != null && (call.durationSec ?? 0) > 0)
+      .toList();
+
+  int get totalCompletedCalls => completedCalls.length;
+
+  List<Call> visibleCalls(int maxCount) {
+    if (maxCount <= 0) return const [];
+    return completedCalls.take(maxCount).toList();
+  }
+
+  bool hasMoreCalls(int maxCount) {
+    if (maxCount <= 0) return calls.isNotEmpty;
+    return completedCalls.length > maxCount;
   }
 }

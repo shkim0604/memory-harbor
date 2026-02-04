@@ -3,6 +3,7 @@ import '../../theme/app_colors.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
 import '../../viewmodels/history_detail_viewmodel.dart';
+import '../../utils/time_utils.dart';
 
 class HistoryDetailScreen extends StatefulWidget {
   final String residenceId;
@@ -425,7 +426,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${call.startedAt.year}.${call.startedAt.month.toString().padLeft(2, '0')}.${call.startedAt.day.toString().padLeft(2, '0')}',
+                _formatDate(call.startedAt),
                 style: const TextStyle(fontSize: 12, color: AppColors.textHint),
               ),
               const SizedBox(height: 2),
@@ -457,5 +458,10 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       return '${hours}시간';
     }
     return '${hours}시간 ${minutes}분';
+  }
+
+  String _formatDate(DateTime dateTime) {
+    final et = TimeUtils.toEt(dateTime);
+    return '${et.year}.${et.month.toString().padLeft(2, '0')}.${et.day.toString().padLeft(2, '0')}';
   }
 }

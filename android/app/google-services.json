@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "498442703852-j37la6f6639hsj2slnbhu9la5eo3q1k5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.delighthouse.memory_harbor",
+            "certificate_hash": "a391e8a4d703a7d72cad4b5d9a09e53911f9dd62"
+          }
+        },
+        {
           "client_id": "498442703852-hb1nukntmspso07oicm2qvusrl450nbd.apps.googleusercontent.com",
           "client_type": 3
         }

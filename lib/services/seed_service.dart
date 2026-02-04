@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/mock_data.dart';
+import '../utils/time_utils.dart';
 
 class SeedService {
   SeedService._();
@@ -14,7 +15,7 @@ class SeedService {
 
     await _seedAll();
     await metaRef.set({
-      'seededAt': DateTime.now().toIso8601String(),
+      'seededAt': TimeUtils.nowEt().toIso8601String(),
       'version': 1,
     });
   }
