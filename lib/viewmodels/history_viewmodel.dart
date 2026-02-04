@@ -25,6 +25,7 @@ class HistoryViewModel {
 
   StreamSubscription<AppUser?>? _userSub;
   StreamSubscription<Group?>? _groupSub;
+  StreamSubscription<Group?>? _receiverGroupSub;
   StreamSubscription<CareReceiver?>? _receiverSub;
   StreamSubscription<List<ResidenceStats>>? _statsSub;
 
@@ -49,9 +50,7 @@ class HistoryViewModel {
       }
 
       if (nextUser.groupIds.isEmpty) {
-        _clearGroupState();
-        status = HistoryStatus.noGroup;
-        onChanged();
+        _subscribeGroupByReceiver(firebaseUser!.uid, onChanged);
         return;
       }
 
@@ -62,12 +61,14 @@ class HistoryViewModel {
   void dispose() {
     _userSub?.cancel();
     _groupSub?.cancel();
+    _receiverGroupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
   }
 
   void _subscribeGroup(String groupId, void Function() onChanged) {
     _groupSub?.cancel();
+    _receiverGroupSub?.cancel();
     status = HistoryStatus.loadingGroup;
     onChanged();
 
@@ -75,6 +76,27 @@ class HistoryViewModel {
       group = nextGroup;
       if (nextGroup == null) {
         status = HistoryStatus.loadingGroup;
+        onChanged();
+        return;
+      }
+
+      _subscribeReceiver(nextGroup.receiverId, onChanged);
+    });
+  }
+
+  void _subscribeGroupByReceiver(String receiverId, void Function() onChanged) {
+    _groupSub?.cancel();
+    _receiverGroupSub?.cancel();
+    status = HistoryStatus.loadingGroup;
+    onChanged();
+
+    _receiverGroupSub = GroupService.instance
+        .streamGroupByReceiverId(receiverId)
+        .listen((nextGroup) {
+      group = nextGroup;
+      if (nextGroup == null) {
+        _clearGroupState();
+        status = HistoryStatus.noGroup;
         onChanged();
         return;
       }
@@ -121,6 +143,7 @@ class HistoryViewModel {
     receiver = null;
     statsList = const [];
     _groupSub?.cancel();
+    _receiverGroupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
   }

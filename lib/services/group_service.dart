@@ -28,11 +28,39 @@ class GroupService {
     });
   }
 
+  Stream<Group?> streamGroupByReceiverId(String receiverId) {
+    if (receiverId.isEmpty) {
+      return const Stream<Group?>.empty();
+    }
+    return _groupsCollection
+        .where('receiverId', isEqualTo: receiverId)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) return null;
+      final doc = snapshot.docs.first;
+      final data = doc.data();
+      return Group.fromJson({...data, 'groupId': doc.id});
+    });
+  }
+
   Future<Group?> getGroup(String groupId) async {
     final doc = await _groupsCollection.doc(groupId).get();
     if (!doc.exists) return null;
     final data = doc.data();
     if (data == null) return null;
+    return Group.fromJson({...data, 'groupId': doc.id});
+  }
+
+  Future<Group?> getGroupByReceiverId(String receiverId) async {
+    if (receiverId.isEmpty) return null;
+    final snapshot = await _groupsCollection
+        .where('receiverId', isEqualTo: receiverId)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    final data = doc.data();
     return Group.fromJson({...data, 'groupId': doc.id});
   }
 }

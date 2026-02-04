@@ -1,74 +1,20 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import 'home/home_screen.dart';
-import 'call/call_screen.dart';
-import 'history/history_screen.dart';
-import 'reviews/review_write_screen.dart';
-import 'reviews/reviews_screen.dart';
-import 'settings/settings_screen.dart';
-import '../viewmodels/call_session_viewmodel.dart';
-import '../widgets/call_status_indicator.dart';
-import '../viewmodels/app_role_viewmodel.dart';
-import 'receiver/receiver_main_navigation.dart';
-import 'auth/auth_screen.dart';
+import '../../theme/app_colors.dart';
+import '../call/receiver_call_screen.dart';
+import '../history/history_screen.dart';
+import '../settings/settings_screen.dart';
+import 'receiver_home_screen.dart';
+import '../../viewmodels/call_session_viewmodel.dart';
+import '../../widgets/call_status_indicator.dart';
 
-class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
+class ReceiverMainNavigation extends StatefulWidget {
+  const ReceiverMainNavigation({super.key});
 
   @override
-  State<MainNavigation> createState() => _MainNavigationState();
+  State<ReceiverMainNavigation> createState() => _ReceiverMainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
-  final AppRoleViewModel _roleViewModel = AppRoleViewModel();
-
-  @override
-  void initState() {
-    super.initState();
-    _roleViewModel.init(onChanged: () {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _roleViewModel.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    switch (_roleViewModel.status) {
-      case AppRoleStatus.unauthenticated:
-        return const AuthScreen();
-      case AppRoleStatus.loading:
-        return const Scaffold(
-          backgroundColor: AppColors.background,
-          body: Center(child: CircularProgressIndicator()),
-        );
-      case AppRoleStatus.noGroup:
-        return const Scaffold(
-          backgroundColor: AppColors.background,
-          body: Center(child: Text('아직 그룹에 속해 있지 않습니다')),
-        );
-      case AppRoleStatus.ready:
-        if (_roleViewModel.role == AppRole.receiver) {
-          return const ReceiverMainNavigation();
-        }
-        return const CaregiverMainNavigation();
-    }
-  }
-}
-
-class CaregiverMainNavigation extends StatefulWidget {
-  const CaregiverMainNavigation({super.key});
-
-  @override
-  State<CaregiverMainNavigation> createState() =>
-      _CaregiverMainNavigationState();
-}
-
-class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
+class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
   int _currentIndex = 0;
   final CallSessionViewModel _session = CallSessionViewModel.instance;
   late final VoidCallback _onSessionChanged;
@@ -90,34 +36,6 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
     super.dispose();
   }
 
-  void _onCallPressed() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CallScreen(
-          startConnecting: true,
-          onCallEnded: _goToReviewWrite,
-        ),
-      ),
-    );
-  }
-
-  void _goToReviews() {
-    if (mounted) {
-      setState(() {
-        _currentIndex = 1;
-      });
-    }
-  }
-
-  void _goToReviewWrite() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ReviewWriteScreen(onDone: _goToReviews),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,11 +45,10 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
             children: [
               IndexedStack(
                 index: _currentIndex,
-                children: [
-                  HomeScreen(onCallPressed: _onCallPressed),
-                  const ReviewsScreen(),
-                  const HistoryScreen(),
-                  const SettingsScreen(),
+                children: const [
+                  ReceiverHomeScreen(),
+                  HistoryScreen(),
+                  SettingsScreen(),
                 ],
               ),
               if (_session.status != CallStatus.ended)
@@ -171,11 +88,6 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: '홈',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.rate_review_outlined),
-              activeIcon: Icon(Icons.rate_review),
-              label: '리뷰',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.location_on_outlined),
@@ -297,7 +209,9 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const CallScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const ReceiverCallScreen(),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.open_in_full, color: Colors.white),
@@ -305,12 +219,7 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
                   IconButton(
                     tooltip: isConnecting ? '취소' : '종료',
                     onPressed: () async {
-                      if (isConnecting) {
-                        await _session.endCall();
-                        return;
-                      }
                       await _session.endCall();
-                      _goToReviewWrite();
                     },
                     icon: Icon(
                       isConnecting ? Icons.close : Icons.call_end,

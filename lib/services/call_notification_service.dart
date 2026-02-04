@@ -8,7 +8,7 @@ import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../screens/call/call_screen.dart';
+import '../screens/call/receiver_call_screen.dart';
 import 'call_invite_service.dart';
 import 'user_service.dart';
 
@@ -119,13 +119,14 @@ class CallNotificationService {
     // Show system incoming call UI.
     await _showIncomingCall(payload);
     _scheduleMissedTimeout(payload.callId);
+    _showInAppIncomingIfResumed(payload);
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
     final payload = CallInvitePayload.fromMessage(message);
     if (payload == null) return;
-    // User tapped notification -> open call screen.
-    _openCallScreen(payload);
+    // User tapped notification -> open incoming UI.
+    _openCallScreen(payload, autoStart: false);
   }
 
   Future<void> _showIncomingCall(CallInvitePayload payload) async {
@@ -216,9 +217,9 @@ class CallNotificationService {
               .answerCall(callId: callId, action: 'accept');
         }
         if (payload != null) {
-          _openCallScreen(payload);
+          _openCallScreen(payload, autoStart: true);
         } else if (callId.isNotEmpty) {
-          _openCallScreen(CallInvitePayload(callId: callId));
+          _openCallScreen(CallInvitePayload(callId: callId), autoStart: true);
         }
       }
 
@@ -239,20 +240,26 @@ class CallNotificationService {
     });
   }
 
-  void _openCallScreen(CallInvitePayload payload) {
+  void _openCallScreen(CallInvitePayload payload, {required bool autoStart}) {
     final nav = _navigatorKey?.currentState;
     if (nav == null) return;
 
-    // Receiver UI not ready yet -> reuse CallScreen directly.
     nav.push(
       MaterialPageRoute(
-        builder: (_) => CallScreen(
-          startConnecting: true,
-          channelName: payload.channelName,
-          callId: payload.callId,
+        builder: (_) => ReceiverCallScreen(
+          payload: payload,
+          autoStart: autoStart,
         ),
       ),
     );
+  }
+
+  void _showInAppIncomingIfResumed(CallInvitePayload payload) {
+    final nav = _navigatorKey?.currentState;
+    if (nav == null) return;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != AppLifecycleState.resumed) return;
+    _openCallScreen(payload, autoStart: false);
   }
 
   void dispose() {
