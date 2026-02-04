@@ -4,6 +4,7 @@ import 'review.dart';
 
 class Call {
   final String callId;
+  final String channelId;
   final String groupId;
   final String receiverId;
   final String caregiverUserId;
@@ -12,6 +13,7 @@ class Call {
   final String receiverNameSnapshot;
   final DateTime startedAt;
   final DateTime? endedAt;
+
   final int? durationSec;
   final CallStatus status;
   final String? recordingUrl;
@@ -23,9 +25,11 @@ class Call {
   final int reviewCount;
   final DateTime? lastReviewAt;
   final List<Review>? reviews;
+  final bool isConfirmed;
 
   const Call({
     required this.callId,
+    required this.channelId,
     required this.groupId,
     required this.receiverId,
     required this.caregiverUserId,
@@ -45,62 +49,71 @@ class Call {
     this.reviewCount = 0,
     this.lastReviewAt,
     this.reviews,
+    this.isConfirmed = false,
   });
 
   factory Call.fromJson(Map<String, dynamic> json) => Call(
-        callId: (json['callId'] ?? '') as String,
-        groupId: (json['groupId'] ?? '') as String,
-        receiverId: (json['receiverId'] ?? '') as String,
-        caregiverUserId: (json['caregiverUserId'] ?? '') as String,
-        groupNameSnapshot: (json['groupNameSnapshot'] ?? '') as String,
-        giverNameSnapshot: (json['giverNameSnapshot'] ?? '') as String,
-        receiverNameSnapshot: (json['receiverNameSnapshot'] ?? '') as String,
-        startedAt: parseDateTime(json['startedAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
-        endedAt: parseDateTime(json['endedAt']),
-        durationSec: json['durationSec'] as int?,
-        status: callStatusFromString((json['status'] ?? 'failed') as String),
-        recordingUrl: json['recordingUrl'] as String?,
-        mentionedResidences: (json['mentionedResidences'] is List)
-            ? (json['mentionedResidences'] as List)
-                .map((e) => Residence.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : const [],
-        humanKeywords: List<String>.from(json['humanKeywords'] ?? const []),
-        humanSummary: (json['humanSummary'] ?? '') as String,
-        humanNotes: (json['humanNotes'] ?? '') as String,
-        aiSummary: (json['aiSummary'] ?? '') as String,
-        reviewCount: (json['reviewCount'] ?? 0) as int,
-        lastReviewAt: parseDateTime(json['lastReviewAt']),
-        reviews: (json['reviews'] is List)
-            ? (json['reviews'] as List)
-                .map((e) => Review.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-            : null,
-      );
+    callId: (json['callId'] ?? '') as String,
+    channelId: (json['channelId'] ?? json['channelName'] ?? '') as String,
+    groupId: (json['groupId'] ?? '') as String,
+    receiverId: (json['receiverId'] ?? '') as String,
+    caregiverUserId: (json['caregiverUserId'] ?? '') as String,
+    groupNameSnapshot: (json['groupNameSnapshot'] ?? '') as String,
+    giverNameSnapshot: (json['giverNameSnapshot'] ?? '') as String,
+    receiverNameSnapshot: (json['receiverNameSnapshot'] ?? '') as String,
+    startedAt:
+        parseDateTime(json['startedAt']) ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+    endedAt: parseDateTime(json['endedAt']),
+    durationSec: json['durationSec'] as int?,
+    status: callStatusFromString((json['status'] ?? 'failed') as String),
+    recordingUrl: json['recordingUrl'] as String?,
+    mentionedResidences: (json['mentionedResidences'] is List)
+        ? (json['mentionedResidences'] as List)
+              .map((e) => Residence.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+        : const [],
+    humanKeywords: List<String>.from(json['humanKeywords'] ?? const []),
+    humanSummary: (json['humanSummary'] ?? '') as String,
+    humanNotes: (json['humanNotes'] ?? '') as String,
+    aiSummary: (json['aiSummary'] ?? '') as String,
+    reviewCount: (json['reviewCount'] ?? 0) as int,
+    lastReviewAt: parseDateTime(json['lastReviewAt']),
+    reviews: (json['reviews'] is List)
+        ? (json['reviews'] as List)
+              .map((e) => Review.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+        : null,
+    isConfirmed: (json['isConfirmed'] ?? false) as bool,
+  );
 
   Map<String, dynamic> toJson() => {
-        'callId': callId,
-        'groupId': groupId,
-        'receiverId': receiverId,
-        'caregiverUserId': caregiverUserId,
-        'groupNameSnapshot': groupNameSnapshot,
-        'giverNameSnapshot': giverNameSnapshot,
-        'receiverNameSnapshot': receiverNameSnapshot,
-        'startedAt': startedAt.toIso8601String(),
-        'endedAt': endedAt?.toIso8601String(),
-        'durationSec': durationSec,
-        'status': callStatusToString(status),
-        'recordingUrl': recordingUrl,
-        'mentionedResidences': mentionedResidences.map((e) => e.toJson()).toList(),
-        'humanKeywords': humanKeywords,
-        'humanSummary': humanSummary,
-        'humanNotes': humanNotes,
-        'aiSummary': aiSummary,
-        'reviewCount': reviewCount,
-        'lastReviewAt': lastReviewAt?.toIso8601String(),
-      };
+    'callId': callId,
+    'channelId': channelId,
+    'channelName': channelId,
+    'groupId': groupId,
+    'receiverId': receiverId,
+    'caregiverUserId': caregiverUserId,
+    'groupNameSnapshot': groupNameSnapshot,
+    'giverNameSnapshot': giverNameSnapshot,
+    'receiverNameSnapshot': receiverNameSnapshot,
+    'startedAt': startedAt.toIso8601String(),
+    'endedAt': endedAt?.toIso8601String(),
+    'durationSec': durationSec,
+    'status': callStatusToString(status),
+    'recordingUrl': recordingUrl,
+    'mentionedResidences': mentionedResidences.map((e) => e.toJson()).toList(),
+    'humanKeywords': humanKeywords,
+    'humanSummary': humanSummary,
+    'humanNotes': humanNotes,
+    'aiSummary': aiSummary,
+    'reviewCount': reviewCount,
+    'lastReviewAt': lastReviewAt?.toIso8601String(),
+    'isConfirmed': isConfirmed,
+  };
 
   Call copyWith({
+    String? channelId,
     DateTime? endedAt,
     int? durationSec,
     CallStatus? status,
@@ -113,9 +126,11 @@ class Call {
     int? reviewCount,
     DateTime? lastReviewAt,
     List<Review>? reviews,
+    bool? isConfirmed,
   }) {
     return Call(
       callId: callId,
+      channelId: channelId ?? this.channelId,
       groupId: groupId,
       receiverId: receiverId,
       caregiverUserId: caregiverUserId,
@@ -135,6 +150,7 @@ class Call {
       reviewCount: reviewCount ?? this.reviewCount,
       lastReviewAt: lastReviewAt ?? this.lastReviewAt,
       reviews: reviews ?? this.reviews,
+      isConfirmed: isConfirmed ?? this.isConfirmed,
     );
   }
 }
