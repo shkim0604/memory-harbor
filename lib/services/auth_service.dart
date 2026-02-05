@@ -74,9 +74,11 @@ class AuthService {
       );
 
       // Create an OAuth credential
-      final oauthCredential = OAuthProvider(
-        'apple.com',
-      ).credential(idToken: appleCredential.identityToken, rawNonce: rawNonce);
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
+      );
 
       // Sign in to Firebase with the credential
       final userCredential = await _auth.signInWithCredential(oauthCredential);
@@ -92,7 +94,13 @@ class AuthService {
       }
 
       return userCredential;
+    } on FirebaseAuthException catch (e) {
+      debugPrint(
+        'Apple Sign-In FirebaseAuthException: code=${e.code} message=${e.message}',
+      );
+      rethrow;
     } catch (e) {
+      debugPrint('Apple Sign-In Error: $e');
       rethrow;
     }
   }

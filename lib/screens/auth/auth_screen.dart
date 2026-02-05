@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart' as apple;
+
 import '../../theme/app_colors.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
@@ -11,13 +14,18 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final AuthViewModel _viewModel = AuthViewModel();
+  bool _appleAvailable = false;
+  static const double _loginButtonHeight = 56.0;
 
   @override
   void initState() {
     super.initState();
-    _viewModel.init(onChanged: () {
-      if (mounted) setState(() {});
-    });
+    _viewModel.init(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+    _loadAppleAvailability();
   }
 
   @override
@@ -28,6 +36,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final showAppleButton = _appleAvailable;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -87,7 +96,23 @@ class _AuthScreenState extends State<AuthScreen> {
                 // Login Buttons
                 if (_viewModel.isLoading)
                   const CircularProgressIndicator(color: AppColors.secondary)
-                else
+                else ...[
+                  if (showAppleButton)
+                    _buildLoginButton(
+                      context,
+                      text: 'Apple로 계속하기',
+                      backgroundColor: Colors.black,
+                      textColor: Colors.white,
+                      onPressed: _handleAppleLogin,
+                      leading: const Text(
+                        '',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (showAppleButton) const SizedBox(height: 12),
                   _buildLoginButton(
                     context,
                     icon: Icons.g_mobiledata_rounded,
@@ -96,6 +121,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     textColor: AppColors.textPrimary,
                     onPressed: _handleGoogleLogin,
                   ),
+                ],
                 const Spacer(),
                 // Terms
                 Padding(
@@ -119,15 +145,21 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Widget _buildLoginButton(
     BuildContext context, {
-    required IconData icon,
     required String text,
     required Color backgroundColor,
     required Color textColor,
     required VoidCallback onPressed,
+    Widget? leading,
+    IconData? icon,
+    double fontSize = 16,
   }) {
+    assert(
+      leading != null || icon != null,
+      'Either leading or icon must be provided.',
+    );
     return SizedBox(
       width: double.infinity,
-      height: 56,
+      height: _loginButtonHeight,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
@@ -142,16 +174,44 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 24),
+            if (leading != null) leading else Icon(icon, size: 24),
             const SizedBox(width: 12),
             Text(
               text,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _loadAppleAvailability() async {
+    if (kIsWeb) return;
+    final platform = defaultTargetPlatform;
+    if (platform != TargetPlatform.iOS && platform != TargetPlatform.macOS) {
+      return;
+    }
+
+    final available = await apple.SignInWithApple.isAvailable();
+    if (!mounted) return;
+    setState(() => _appleAvailable = available);
+  }
+
+  Future<void> _handleAppleLogin() async {
+    final result = await _viewModel.signInWithApple();
+    if (!mounted) return;
+
+    if (result.errorMessage != null) {
+      _showErrorSnackBar(result.errorMessage!);
+      return;
+    }
+
+    if (result.nextStep == AuthNextStep.main) {
+      Navigator.of(context).pushReplacementNamed('/main');
+    } else if (result.nextStep == AuthNextStep.onboarding) {
+      Navigator.of(context).pushReplacementNamed('/onboarding');
+    }
   }
 
   Future<void> _handleGoogleLogin() async {
