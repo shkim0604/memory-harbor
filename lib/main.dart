@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,10 +12,44 @@ import 'theme/app_colors.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/call/receiver_call_screen.dart';
+import 'viewmodels/call_session_viewmodel.dart';
 import 'utils/time_utils.dart';
 
 // Global navigator for push/callkit routing.
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+const String _lifeTag = '[LIFE]';
+final AppLifecycleLogger _lifecycleLogger = AppLifecycleLogger();
+
+class AppLifecycleLogger with WidgetsBindingObserver {
+  bool _registered = false;
+  AppLifecycleState? _lastState;
+  final StreamController<AppLifecycleState> _stateController =
+      StreamController<AppLifecycleState>.broadcast();
+
+  AppLifecycleState? get lastState => _lastState;
+  Stream<AppLifecycleState> get stateStream => _stateController.stream;
+
+  void register() {
+    if (_registered) return;
+    _registered = true;
+    WidgetsBinding.instance.addObserver(this);
+    final initialState = WidgetsBinding.instance.lifecycleState;
+    if (initialState != null) {
+      _lastState = initialState;
+      _stateController.add(initialState);
+      debugPrint('$_lifeTag initial state=$initialState');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _lastState = state;
+    _stateController.add(state);
+    debugPrint('$_lifeTag state=$state');
+  }
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -24,13 +60,83 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _lifecycleLogger.register();
   TimeUtils.initialize();
   await FirebaseConfig.initialize();
   // FCM background handler must be registered before runApp.
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   // Initialize push/callkit handling and token registration.
-  await CallNotificationService.instance
-      .init(navigatorKey: appNavigatorKey);
+  await CallNotificationService.instance.init();
+
+  // Listen for incoming call events and navigate accordingly.
+  // Guard against pushing a duplicate ReceiverCallScreen (e.g. if both
+  // VoIP push and FCM trigger an accept event for the same call).
+  bool receiverScreenActive = false;
+  IncomingCallEvent? pendingIncoming;
+
+  void tryHandlePending() {
+    if (receiverScreenActive) return;
+    if (pendingIncoming == null) return;
+    if (_lifecycleLogger.lastState != AppLifecycleState.resumed) return;
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    final event = pendingIncoming!;
+    debugPrint('$_lifeTag pending incoming -> navigate callId=${event.payload.callId}, autoStart=${event.autoStart}');
+    pendingIncoming = null;
+    receiverScreenActive = true;
+    nav
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ReceiverCallScreen(
+              payload: event.payload,
+              autoStart: event.autoStart,
+            ),
+          ),
+        )
+        .then((_) {
+          receiverScreenActive = false;
+          debugPrint('$_lifeTag receiver screen closed (pending)');
+        });
+  }
+
+  _lifecycleLogger.stateStream.listen((state) {
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('$_lifeTag resumed -> tryHandlePending');
+      tryHandlePending();
+    }
+  });
+
+  CallNotificationService.instance.incomingCallStream.listen((event) {
+    debugPrint('$_lifeTag incoming call event callId=${event.payload.callId}, autoStart=${event.autoStart}');
+    if (receiverScreenActive) return;
+    final nav = appNavigatorKey.currentState;
+    if (nav == null || _lifecycleLogger.lastState != AppLifecycleState.resumed) {
+      debugPrint('$_lifeTag incoming call deferred (nav=${nav != null}, state=${_lifecycleLogger.lastState})');
+      pendingIncoming = event;
+      if (event.autoStart) {
+        debugPrint('$_lifeTag autoStart in background -> accept call silently');
+        unawaited(CallSessionViewModel.instance.acceptIncomingSilent(
+          payload: event.payload,
+        ));
+      }
+      return;
+    }
+    receiverScreenActive = true;
+    nav
+        .push(
+          MaterialPageRoute(
+            builder: (_) => ReceiverCallScreen(
+              payload: event.payload,
+              autoStart: event.autoStart,
+            ),
+          ),
+        )
+        .then((_) {
+          receiverScreenActive = false;
+          debugPrint('$_lifeTag receiver screen closed');
+        });
+  });
+
   runApp(const MyApp());
 }
 
@@ -110,8 +216,9 @@ class _SplashScreenState extends State<SplashScreen>
           final userExists = await UserService.instance
               .userExists(user.uid)
               .timeout(const Duration(seconds: 4));
-          nextScreen =
-              userExists ? const MainNavigation() : const OnboardingScreen();
+          nextScreen = userExists
+              ? const MainNavigation()
+              : const OnboardingScreen();
         }
       } catch (e, st) {
         debugPrint('Splash navigation check failed: $e');
