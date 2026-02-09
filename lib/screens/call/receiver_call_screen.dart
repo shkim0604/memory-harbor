@@ -1,23 +1,15 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/call_session_viewmodel.dart';
-import '../../services/call_invite_service.dart';
 import '../../services/call_notification_service.dart';
 import '../../widgets/call_status_indicator.dart';
-import '../../services/call_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ReceiverCallScreen extends StatefulWidget {
   final CallInvitePayload? payload;
   final bool autoStart;
 
-  const ReceiverCallScreen({
-    super.key,
-    this.payload,
-    this.autoStart = false,
-  });
+  const ReceiverCallScreen({super.key, this.payload, this.autoStart = false});
 
   @override
   State<ReceiverCallScreen> createState() => _ReceiverCallScreenState();
@@ -28,8 +20,6 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   late final VoidCallback _onSessionChanged;
   bool _accepted = false;
   bool _starting = false;
-  bool _ending = false;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callStatusSub;
   bool _actionLocked = false;
 
   @override
@@ -37,28 +27,36 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     super.initState();
     _onSessionChanged = () {
       if (!mounted) return;
-      if (_accepted && _session.status == CallStatus.ended) {
+      // Server cancelled the call while still ringing.
+      if (_session.remotelyCancelled &&
+          _session.status == CallSessionState.ended) {
         Navigator.of(context).popUntil((route) => route.isFirst);
         return;
+      }
+      if (_session.status == CallSessionState.ended) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+      if (_session.status == CallSessionState.onCall && !_accepted) {
+        _accepted = true;
       }
       setState(() {});
     };
     _session.init();
     _session.addListener(_onSessionChanged);
-    _accepted = widget.autoStart || _session.status != CallStatus.ended;
-    if (widget.autoStart) {
-      _startCall();
+    _accepted = widget.autoStart || _session.status != CallSessionState.ended;
+    if (widget.autoStart && widget.payload != null) {
+      _autoStartCall();
     }
 
     final callId = widget.payload?.callId ?? '';
     if (callId.isNotEmpty) {
-      _attachCallStatusListener(callId);
+      _session.watchCallStatus(callId);
     }
   }
 
   @override
   void dispose() {
-    _callStatusSub?.cancel();
     _session.removeListener(_onSessionChanged);
     super.dispose();
   }
@@ -69,6 +67,9 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     final displayName = (callerName != null && callerName.isNotEmpty)
         ? callerName
         : '상대방';
+
+    final showInCallControls =
+        _accepted || _session.status == CallSessionState.onCall;
 
     return Scaffold(
       backgroundColor: AppColors.secondary,
@@ -82,7 +83,9 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
             const SizedBox(height: 24),
             _buildStatus(),
             const Spacer(),
-            _accepted ? _buildInCallControls() : _buildIncomingControls(),
+            showInCallControls
+                ? _buildInCallControls()
+                : _buildIncomingControls(),
             const SizedBox(height: 32),
           ],
         ),
@@ -97,7 +100,12 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close, color: Colors.white),
+            icon: Icon(
+              Icons.keyboard_arrow_down,
+              color: Colors.white,
+              size: Platform.isIOS ? 28 : 24,
+            ),
+            tooltip: '작게 보기',
           ),
           const Spacer(),
           Text(
@@ -140,9 +148,9 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
 
   Widget _buildStatus() {
     final statusText = switch (_session.status) {
-      CallStatus.connecting => '연결 중...',
-      CallStatus.onCall => '통화 중 · ${_session.formattedDuration}',
-      CallStatus.ended => _accepted ? '통화 종료' : '수신 대기',
+      CallSessionState.connecting => '연결 중...',
+      CallSessionState.onCall => '통화 중 · ${_session.formattedDuration}',
+      CallSessionState.ended => _accepted ? '통화 종료' : '수신 대기',
     };
 
     return Text(
@@ -178,7 +186,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   }
 
   Widget _buildInCallControls() {
-    final isInCall = _session.status == CallStatus.onCall;
+    final isInCall = _session.status == CallSessionState.onCall;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -280,11 +288,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
                     ? AppColors.primary
                     : Colors.white.withValues(alpha: 0.15),
               ),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: 24,
-              ),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
             const SizedBox(height: 6),
             Text(
@@ -307,11 +311,13 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     _starting = true;
     _actionLocked = true;
     try {
-      await CallInviteService.instance
-          .answerCall(callId: payload.callId, action: 'accept');
       _accepted = true;
       if (mounted) setState(() {});
-      await _startCall();
+      final ok = await _session.acceptIncoming(context, payload: payload);
+      if (!ok) {
+        _accepted = false;
+        if (mounted) setState(() {});
+      }
     } finally {
       _starting = false;
       _actionLocked = false;
@@ -319,43 +325,26 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   }
 
   Future<void> _declineCall() async {
-    if (_ending || _actionLocked) return;
-    _ending = true;
+    if (_actionLocked) return;
     _actionLocked = true;
     final payload = widget.payload;
     if (payload != null && payload.callId.isNotEmpty) {
-      await CallInviteService.instance
-          .answerCall(callId: payload.callId, action: 'decline');
+      await _session.declineIncoming(callId: payload.callId);
     }
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
-    _ending = false;
     _actionLocked = false;
   }
 
-  Future<void> _startCall() async {
+  Future<void> _autoStartCall() async {
     final payload = widget.payload;
-    if (payload == null) {
-      _showError('채널 정보를 찾을 수 없습니다');
-      return;
+    if (payload == null) return;
+    final ok = await _session.acceptIncoming(context, payload: payload);
+    if (!ok) {
+      _accepted = false;
+      if (mounted) setState(() {});
     }
-    final channelName = payload.channelName.isNotEmpty
-        ? payload.channelName
-        : payload.callId;
-    if (channelName.isEmpty) {
-      _showError('채널 정보를 찾을 수 없습니다');
-      return;
-    }
-
-    await _session.startCall(
-      context,
-      groupId: payload.groupId,
-      channelName: channelName,
-      callerUserId: payload.callerId,
-      peerUserId: payload.receiverId,
-      callId: payload.callId,
-    );
   }
 
   Future<void> _endCall() async {
@@ -366,27 +355,5 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     } finally {
       _actionLocked = false;
     }
-  }
-
-  void _attachCallStatusListener(String callId) {
-    _callStatusSub?.cancel();
-    _callStatusSub =
-        CallService.instance.streamCallDoc(callId).listen((snapshot) async {
-      final data = snapshot.data();
-      if (data == null) return;
-      final status = (data['status'] ?? '') as String;
-      if (status == 'missed' || status == 'declined' || status == 'cancelled') {
-        await _session.endCall();
-        if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      }
-    });
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red.shade400),
-    );
   }
 }

@@ -14,6 +14,7 @@ import 'screens/auth/onboarding_screen.dart';
 import 'screens/main_navigation.dart';
 import 'screens/call/receiver_call_screen.dart';
 import 'viewmodels/call_session_viewmodel.dart';
+import 'widgets/call_status_indicator.dart';
 import 'utils/time_utils.dart';
 
 // Global navigator for push/callkit routing.
@@ -108,6 +109,10 @@ Future<void> main() async {
 
   CallNotificationService.instance.incomingCallStream.listen((event) {
     debugPrint('$_lifeTag incoming call event callId=${event.payload.callId}, autoStart=${event.autoStart}');
+    if (CallSessionViewModel.instance.status == CallSessionState.onCall) {
+      debugPrint('$_lifeTag incoming call ignored: already onCall');
+      return;
+    }
     if (receiverScreenActive) return;
     final nav = appNavigatorKey.currentState;
     if (nav == null || _lifecycleLogger.lastState != AppLifecycleState.resumed) {
