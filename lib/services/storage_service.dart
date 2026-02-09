@@ -1,16 +1,19 @@
 import 'dart:io';
 
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import '../config/agora_config.dart';
+import 'api_client.dart';
 
 /// Firebase Storage 서비스
 class StorageService {
   StorageService._();
   static final instance = StorageService._();
 
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _picker = ImagePicker();
+  final ApiClient _api = ApiClient.instance;
+
+  String get _apiBaseUrl => AgoraConfig.apiBaseUrl;
 
   /// 갤러리에서 이미지 선택
   Future<File?> pickImageFromGallery() async {
@@ -52,18 +55,22 @@ class StorageService {
     required File imageFile,
   }) async {
     try {
-      final ref = _storage.ref().child('profiles/$userId/profile.jpg');
-
-      final uploadTask = ref.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/jpeg'),
+      if (_apiBaseUrl.trim().isEmpty) return null;
+      final url = '$_apiBaseUrl/api/user/profile-image';
+      final response = await _api.postMultipart(
+        url,
+        file: imageFile,
+        fileField: 'file',
+        contentType: 'image/jpeg',
+        fields: {'userId': userId},
       );
-
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-
-      debugPrint('Profile image uploaded: $downloadUrl');
-      return downloadUrl;
+      if (response == null) return null;
+      final downloadUrl = response['url'];
+      if (downloadUrl is String && downloadUrl.isNotEmpty) {
+        debugPrint('Profile image uploaded: $downloadUrl');
+        return downloadUrl;
+      }
+      return null;
     } catch (e) {
       debugPrint('Error uploading profile image: $e');
       return null;
@@ -73,8 +80,9 @@ class StorageService {
   /// 프로필 이미지 삭제
   Future<void> deleteProfileImage(String userId) async {
     try {
-      final ref = _storage.ref().child('profiles/$userId/profile.jpg');
-      await ref.delete();
+      if (_apiBaseUrl.trim().isEmpty) return;
+      final url = '$_apiBaseUrl/api/user/profile-image/delete';
+      await _api.postJsonOk(url, {});
     } catch (e) {
       debugPrint('Error deleting profile image: $e');
     }

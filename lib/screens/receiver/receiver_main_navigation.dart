@@ -3,6 +3,7 @@ import '../../theme/app_colors.dart';
 import '../call/receiver_call_screen.dart';
 import '../history/history_screen.dart';
 import '../settings/settings_screen.dart';
+import '../community/community_members_screen.dart';
 import 'receiver_home_screen.dart';
 import '../../viewmodels/call_session_viewmodel.dart';
 import '../../widgets/call_status_indicator.dart';
@@ -48,10 +49,11 @@ class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
                 children: const [
                   ReceiverHomeScreen(),
                   HistoryScreen(),
+                  CommunityMembersScreen(),
                   SettingsScreen(),
                 ],
               ),
-              if (_session.status != CallStatus.ended)
+              if (_session.status != CallSessionState.ended)
                 _buildCallPip(context, constraints),
             ],
           );
@@ -95,6 +97,11 @@ class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
               label: '히스토리',
             ),
             BottomNavigationBarItem(
+              icon: Icon(Icons.group_outlined),
+              activeIcon: Icon(Icons.group),
+              label: '공동체',
+            ),
+            BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
               activeIcon: Icon(Icons.settings),
               label: '설정',
@@ -110,11 +117,9 @@ class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
     const pipMinHeight = 64.0;
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final isConnecting = _session.status == CallStatus.connecting;
-    final isOnCall = _session.status == CallStatus.onCall;
-    final label = isConnecting
-        ? '연결 중...'
-        : (isOnCall ? '통화 중' : '통화 대기');
+    final isConnecting = _session.status == CallSessionState.connecting;
+    final isOnCall = _session.status == CallSessionState.onCall;
+    final label = isConnecting ? '연결 중...' : (isOnCall ? '통화 중' : '통화 대기');
 
     final availableWidth = constraints.maxWidth - (margin * 2);
     final pipWidth = availableWidth.clamp(240.0, 360.0);
@@ -123,8 +128,10 @@ class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
     final minX = margin;
     final maxX = (constraints.maxWidth - pipWidth - margin).clamp(minX, 1e9);
     final minY = margin;
-    final maxY = (constraints.maxHeight - pipMinHeight - reservedBottom)
-        .clamp(minY, 1e9);
+    final maxY = (constraints.maxHeight - pipMinHeight - reservedBottom).clamp(
+      minY,
+      1e9,
+    );
 
     final defaultOffset = Offset(minX, maxY);
     _callPipOffset ??= defaultOffset;
@@ -177,7 +184,11 @@ class _ReceiverMainNavigationState extends State<ReceiverMainNavigation> {
                       shape: BoxShape.circle,
                       color: isOnCall ? AppColors.onCall : AppColors.connecting,
                     ),
-                    child: const Icon(Icons.call, color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.call,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

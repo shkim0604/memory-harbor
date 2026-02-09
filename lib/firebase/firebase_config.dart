@@ -53,6 +53,11 @@ class FirebaseConfig {
 
   static Future<void> initialize() async {
     await Firebase.initializeApp(options: options);
+    final opts = Firebase.app().options;
+    debugPrint(
+      'Firebase init: projectId=${opts.projectId} appId=${opts.appId} '
+      'iosBundleId=${opts.iosBundleId ?? ''} useEmulator=$useEmulator',
+    );
 
     if (!useEmulator) return;
 

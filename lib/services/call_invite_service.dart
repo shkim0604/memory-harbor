@@ -1,21 +1,18 @@
-import 'dart:convert';
-import 'dart:io';
-
 import '../config/agora_config.dart';
+import 'api_client.dart';
 
 class CallInviteResult {
   final String callId;
   final String channelName;
 
-  const CallInviteResult({
-    required this.callId,
-    required this.channelName,
-  });
+  const CallInviteResult({required this.callId, required this.channelName});
 }
 
 class CallInviteService {
   CallInviteService._();
   static final CallInviteService instance = CallInviteService._();
+
+  String get _baseUrl => AgoraConfig.apiBaseUrl.trim();
 
   Future<CallInviteResult?> inviteCall({
     required String groupId,
@@ -25,15 +22,9 @@ class CallInviteService {
     String? groupNameSnapshot,
     String? receiverNameSnapshot,
   }) async {
-    if (AgoraConfig.apiBaseUrl.trim().isEmpty) return null;
-    final uri = Uri.parse('${AgoraConfig.apiBaseUrl}/api/call/invite');
-
-    try {
-      final client = HttpClient();
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(
-        jsonEncode(<String, dynamic>{
+    if (_baseUrl.isEmpty) return null;
+    final json = await ApiClient.instance
+        .postJson('$_baseUrl/api/call/invite', <String, dynamic>{
           'group_id': groupId,
           'caller_id': callerId,
           'receiver_id': receiverId,
@@ -44,26 +35,12 @@ class CallInviteService {
           if (receiverNameSnapshot != null &&
               receiverNameSnapshot.trim().isNotEmpty)
             'receiver_name_snapshot': receiverNameSnapshot.trim(),
-        }),
-      );
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      client.close();
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return null;
-      }
-
-      final json = jsonDecode(body);
-      if (json is Map) {
-        final callId = (json['callId'] ?? '') as String;
-        final channelName = (json['channelName'] ?? '') as String;
-        if (callId.isNotEmpty && channelName.isNotEmpty) {
-          return CallInviteResult(callId: callId, channelName: channelName);
-        }
-      }
-    } catch (_) {
-      return null;
+        });
+    if (json == null) return null;
+    final callId = (json['callId'] ?? '') as String;
+    final channelName = (json['channelName'] ?? '') as String;
+    if (callId.isNotEmpty && channelName.isNotEmpty) {
+      return CallInviteResult(callId: callId, channelName: channelName);
     }
     return null;
   }
@@ -72,39 +49,23 @@ class CallInviteService {
     required String callId,
     required String action, // accept | decline
   }) async {
-    return _postJson('/api/call/answer', {
-      'call_id': callId,
-      'action': action,
-    });
+    return _postOk('/api/call/answer', {'call_id': callId, 'action': action});
   }
 
   Future<bool> cancelCall({required String callId}) async {
-    return _postJson('/api/call/cancel', {'call_id': callId});
+    return _postOk('/api/call/cancel', {'call_id': callId});
   }
 
   Future<bool> missedCall({required String callId}) async {
-    return _postJson('/api/call/missed', {'call_id': callId});
+    return _postOk('/api/call/missed', {'call_id': callId});
   }
 
   Future<bool> endCall({required String callId}) async {
-    return _postJson('/api/call/end', {'call_id': callId});
+    return _postOk('/api/call/end', {'call_id': callId});
   }
 
-  Future<bool> _postJson(String path, Map<String, dynamic> body) async {
-    if (AgoraConfig.apiBaseUrl.trim().isEmpty) return false;
-    final uri = Uri.parse('${AgoraConfig.apiBaseUrl}$path');
-
-    try {
-      final client = HttpClient();
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(body));
-      final response = await request.close();
-      await response.transform(utf8.decoder).join();
-      client.close();
-      return response.statusCode >= 200 && response.statusCode < 300;
-    } catch (_) {
-      return false;
-    }
+  Future<bool> _postOk(String path, Map<String, dynamic> body) async {
+    if (_baseUrl.isEmpty) return false;
+    return ApiClient.instance.postJsonOk('$_baseUrl$path', body);
   }
 }

@@ -1,18 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import '../../models/models.dart' hide CallStatus;
+import '../../models/models.dart';
 import '../../config/call_config.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/call_status_indicator.dart';
+import '../../widgets/memo_bottom_sheet.dart';
 import 'call_detail_screen.dart';
 import '../reviews/review_write_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../viewmodels/call_viewmodel.dart';
 import '../../viewmodels/call_session_viewmodel.dart';
-import '../../services/call_service.dart';
-import '../../services/call_invite_service.dart';
-import '../../services/call_service.dart';
 
 class CallScreen extends StatefulWidget {
   final bool startConnecting;
@@ -45,23 +40,29 @@ class _CallScreenState extends State<CallScreen> {
   late final VoidCallback _onSessionChanged;
   bool _autoStarted = false;
   bool _autoStartPending = false;
-  CallStatus _lastStatus = CallStatus.ended;
+  CallSessionState _lastStatus = CallSessionState.ended;
   bool _reviewPromptShowing = false;
-  bool _callRecorded = false;
   String? _activeCallId;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _callStatusSub;
   bool _callActionLocked = false;
 
   @override
   void initState() {
     super.initState();
     _onSessionChanged = () {
-      if (_session.status == CallStatus.ended) {
+      if (_session.status == CallSessionState.ended) {
         _autoStarted = false;
         _autoStartPending = false;
       }
-      if (_lastStatus == CallStatus.onCall &&
-          _session.status == CallStatus.ended) {
+      // Server cancelled the call while still ringing.
+      if (_session.remotelyCancelled &&
+          _session.status == CallSessionState.ended) {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+        return;
+      }
+      if (_lastStatus == CallSessionState.onCall &&
+          _session.status == CallSessionState.ended) {
         _handleCallEndedFromOnCall();
       }
       _lastStatus = _session.status;
@@ -78,7 +79,7 @@ class _CallScreenState extends State<CallScreen> {
     );
 
     if (widget.callId != null && widget.callId!.isNotEmpty) {
-      _attachCallStatusListener(widget.callId!);
+      _session.watchCallStatus(widget.callId!);
     }
 
     if (widget.startConnecting) {
@@ -96,25 +97,22 @@ class _CallScreenState extends State<CallScreen> {
     _session.removeListener(_onSessionChanged);
     _session.removeErrorListener(_showErrorSnackBar);
     _viewModel.dispose();
-    _callStatusSub?.cancel();
     super.dispose();
   }
 
   String get _formattedDuration => _session.formattedDuration;
 
-  Future<void> _startCall() async {
-    await _startCallWithContext();
-  }
-
   Future<void> _startCallWithContext() async {
     if (_autoStarted || _callActionLocked) return;
     _callActionLocked = true;
     _autoStarted = true;
-    _callRecorded = false;
     final groupId = widget.groupId ?? _viewModel.group?.groupId;
     final callerUserId = _viewModel.user?.uid;
     final peerUserId = _viewModel.receiver?.receiverId;
     String? channelName = widget.channelName;
+
+    // If channel info was already provided (e.g. from an existing call),
+    // join directly. Otherwise ask the ViewModel to invite + join.
     if ((channelName == null || channelName.isEmpty) &&
         groupId != null &&
         groupId.isNotEmpty &&
@@ -122,7 +120,8 @@ class _CallScreenState extends State<CallScreen> {
         callerUserId.isNotEmpty &&
         peerUserId != null &&
         peerUserId.isNotEmpty) {
-      final invite = await CallInviteService.instance.inviteCall(
+      final ok = await _session.startCallWithInvite(
+        context,
         groupId: groupId,
         callerId: callerUserId,
         receiverId: peerUserId,
@@ -130,17 +129,12 @@ class _CallScreenState extends State<CallScreen> {
         groupNameSnapshot: _viewModel.group?.name,
         receiverNameSnapshot: _viewModel.receiver?.name,
       );
-      if (invite == null) {
-        _showErrorSnackBar('통화 요청 실패: 서버에 연결할 수 없습니다');
+      if (!ok) {
         _autoStarted = false;
-        _callActionLocked = false;
-        return;
       }
-      _activeCallId = invite.callId;
-      _attachCallStatusListener(invite.callId);
-      channelName = invite.channelName.isNotEmpty
-          ? invite.channelName
-          : invite.callId;
+      _activeCallId = _session.currentCallId;
+      _callActionLocked = false;
+      return;
     }
 
     await _session.startCall(
@@ -166,13 +160,10 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _endCall() async {
     if (_callActionLocked) return;
     _callActionLocked = true;
-    final wasOnCall = _session.status == CallStatus.onCall;
+    final wasOnCall = _session.status == CallSessionState.onCall;
     await _session.endCall();
     _autoStarted = false;
     _autoStartPending = false;
-    if (!wasOnCall && _activeCallId != null) {
-      await CallInviteService.instance.cancelCall(callId: _activeCallId!);
-    }
     if (!wasOnCall) {
       widget.onCallEnded?.call();
       if (mounted) {
@@ -190,15 +181,10 @@ class _CallScreenState extends State<CallScreen> {
     await _session.toggleSpeaker();
   }
 
-  Future<void> _toggleRecording() async {
-    await _session.toggleRecording();
-  }
-
   Future<void> _handleCallEndedFromOnCall() async {
     if (_reviewPromptShowing || !mounted) return;
     final durationSeconds = _session.callDurationSeconds;
     if (durationSeconds < CallConfig.normalCallMinSeconds) {
-      await _recordCall(isConfirmed: false);
       final navigator = Navigator.of(context);
       navigator.popUntil((route) => route.isFirst);
       return;
@@ -231,7 +217,6 @@ class _CallScreenState extends State<CallScreen> {
     _reviewPromptShowing = false;
 
     if (isNormal == true) {
-      await _recordCall(isConfirmed: true);
       navigator.popUntil((route) => route.isFirst);
       navigator.push(
         MaterialPageRoute(
@@ -243,39 +228,14 @@ class _CallScreenState extends State<CallScreen> {
         ),
       );
     } else {
-      await _recordCall(isConfirmed: false);
       navigator.popUntil((route) => route.isFirst);
     }
-  }
-
-  Future<void> _recordCall({required bool isConfirmed}) async {
-    if (_callRecorded) return;
-    // Calls are persisted by the server; client should not write to `calls`.
-    _callRecorded = true;
   }
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red.shade400),
     );
-  }
-
-  void _attachCallStatusListener(String callId) {
-    _callStatusSub?.cancel();
-    _callStatusSub = CallService.instance.streamCallDoc(callId).listen((
-      snapshot,
-    ) async {
-      final data = snapshot.data();
-      if (data == null) return;
-      final status = (data['status'] ?? '') as String;
-      if (_session.status == CallStatus.onCall) return;
-      if (status == 'missed' || status == 'declined' || status == 'cancelled') {
-        await _session.endCall();
-        if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      }
-    });
   }
 
   @override
@@ -524,7 +484,7 @@ class _CallScreenState extends State<CallScreen> {
   // 하단: 통화 관련 아이콘들
   // ============================================================
   Widget _buildControlSection() {
-    final isInCall = _session.status == CallStatus.onCall;
+    final isInCall = _session.status == CallSessionState.onCall;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
@@ -566,9 +526,9 @@ class _CallScreenState extends State<CallScreen> {
 
   Widget _buildStatusCard() {
     final statusText = switch (_session.status) {
-      CallStatus.connecting => '연결 중',
-      CallStatus.onCall => '통화 중',
-      CallStatus.ended => '종료됨',
+      CallSessionState.connecting => '연결 중',
+      CallSessionState.onCall => '통화 중',
+      CallSessionState.ended => '종료됨',
     };
     final statusColor = _getStatusColor();
 
@@ -599,7 +559,7 @@ class _CallScreenState extends State<CallScreen> {
               fontSize: 12,
             ),
           ),
-          if (_session.status == CallStatus.onCall) ...[
+          if (_session.status == CallSessionState.onCall) ...[
             const SizedBox(width: 8),
             Text(
               _formattedDuration,
@@ -662,8 +622,8 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Widget _buildEndCallButton() {
-    final isEnded = _session.status == CallStatus.ended;
-    final isConnecting = _session.status == CallStatus.connecting;
+    final isEnded = _session.status == CallSessionState.ended;
+    final isConnecting = _session.status == CallSessionState.connecting;
 
     return GestureDetector(
       onTap: () {
@@ -673,7 +633,7 @@ class _CallScreenState extends State<CallScreen> {
           return;
         }
         if (isEnded) {
-          _startCall();
+          _startCallWithContext();
         } else {
           _endCall();
         }
@@ -721,90 +681,16 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _showMemoBottomSheet() {
-    final memoController = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '통화 메모',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: memoController,
-                maxLines: 4,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: '통화 내용을 메모하세요...',
-                  hintStyle: TextStyle(color: AppColors.textHint),
-                  filled: true,
-                  fillColor: AppColors.surfaceVariant,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '저장',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    showMemoBottomSheet(context);
   }
 
   Color _getStatusColor() {
     switch (_session.status) {
-      case CallStatus.connecting:
+      case CallSessionState.connecting:
         return AppColors.connecting;
-      case CallStatus.onCall:
+      case CallSessionState.onCall:
         return AppColors.onCall;
-      case CallStatus.ended:
+      case CallSessionState.ended:
         return AppColors.ended;
     }
   }

@@ -1,11 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../config/agora_config.dart';
 import '../models/group.dart';
+import 'api_client.dart';
 
 class GroupService {
   GroupService._();
   static final instance = GroupService._();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ApiClient _api = ApiClient.instance;
+
+  String get _apiBaseUrl => AgoraConfig.apiBaseUrl;
 
   CollectionReference<Map<String, dynamic>> get _groupsCollection =>
       _firestore.collection('groups');
@@ -42,6 +47,30 @@ class GroupService {
       final data = doc.data();
       return Group.fromJson({...data, 'groupId': doc.id});
     });
+  }
+
+  Future<bool> assignReceiverIfEmpty({
+    required String groupId,
+    required String receiverId,
+  }) async {
+    if (groupId.isEmpty || receiverId.isEmpty) return false;
+    if (_apiBaseUrl.trim().isEmpty) return false;
+    final url = '$_apiBaseUrl/api/group/assign-receiver';
+    final result = await _api.postJson(url, {
+      'groupId': groupId,
+      'receiverId': receiverId,
+    });
+    if (result == null) return false;
+    final assigned = result['assigned'];
+    if (assigned is bool) return assigned;
+    return true;
+  }
+
+  Future<List<Group>> listGroups() async {
+    final snapshot = await _groupsCollection.get();
+    return snapshot.docs
+        .map((doc) => Group.fromJson({...doc.data(), 'groupId': doc.id}))
+        .toList();
   }
 
   Future<Group?> getGroup(String groupId) async {

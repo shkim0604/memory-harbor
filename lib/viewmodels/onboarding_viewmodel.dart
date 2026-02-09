@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../services/permission_service.dart';
 import '../services/storage_service.dart';
 import '../services/user_service.dart';
+import '../services/group_service.dart';
+import '../models/group.dart';
 
 class OnboardingViewModel {
   bool isLoading = false;
@@ -12,12 +14,17 @@ class OnboardingViewModel {
   String? profileImageUrl;
   String? initialName;
   String? initialEmail;
+  List<Group> groups = [];
+  final Set<String> selectedGroupIds = {};
+  final Map<String, String> selectedGroupRoles = {};
+  bool groupsLoading = false;
 
   void Function()? _onChanged;
 
   void init({required void Function() onChanged}) {
     _onChanged = onChanged;
     _prefillUserData();
+    _loadGroups();
   }
 
   void dispose() {
@@ -33,6 +40,38 @@ class OnboardingViewModel {
       profileImageUrl = user!.photoURL;
     }
     initialEmail = user?.email ?? '';
+    _onChanged?.call();
+  }
+
+  Future<void> _loadGroups() async {
+    if (groupsLoading) return;
+    groupsLoading = true;
+    _onChanged?.call();
+    try {
+      groups = await GroupService.instance.listGroups();
+    } finally {
+      groupsLoading = false;
+      _onChanged?.call();
+    }
+  }
+
+  void toggleGroupSelection(Group group, bool selected) {
+    final groupId = group.groupId;
+    if (selected) {
+      selectedGroupIds.add(groupId);
+      if (group.receiverId.isNotEmpty) {
+        selectedGroupRoles[groupId] = 'companion';
+      }
+    } else {
+      selectedGroupIds.remove(groupId);
+      selectedGroupRoles.remove(groupId);
+    }
+    _onChanged?.call();
+  }
+
+  void setGroupRole(String groupId, String role) {
+    if (!selectedGroupIds.contains(groupId)) return;
+    selectedGroupRoles[groupId] = role;
     _onChanged?.call();
   }
 
@@ -57,7 +96,7 @@ class OnboardingViewModel {
     return true;
   }
 
-  Future<String?> submitProfile(String name) async {
+  Future<String?> submitProfile(String name, String introMessage) async {
     if (isLoading) return null;
     isLoading = true;
     _onChanged?.call();
@@ -76,11 +115,25 @@ class OnboardingViewModel {
         );
       }
 
+      for (final groupId in selectedGroupIds) {
+        final role = selectedGroupRoles[groupId];
+        if (role != 'narrator') continue;
+        final success = await GroupService.instance.assignReceiverIfEmpty(
+          groupId: groupId,
+          receiverId: user.uid,
+        );
+        if (!success) {
+          return '이미 Narrator가 있는 그룹입니다';
+        }
+      }
+
       await UserService.instance.createUser(
         uid: user.uid,
         name: name,
         email: user.email ?? '',
         profileImage: finalProfileImageUrl,
+        introMessage: introMessage,
+        groupIds: selectedGroupIds.toList(),
       );
 
       return null;

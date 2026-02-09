@@ -12,7 +12,9 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _introController = TextEditingController();
   final OnboardingViewModel _viewModel = OnboardingViewModel();
+  static const int _introMaxLength = 50;
 
   @override
   void initState() {
@@ -59,6 +61,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _introController.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -79,9 +82,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Form(
               key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   const SizedBox(height: 60),
                   // Welcome Text
                   const Text(
@@ -210,7 +215,198 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '그룹원들에게 한 마디',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _introController,
+                    decoration: InputDecoration(
+                      hintText: '그룹원들에게 전하고 싶은 말을 적어주세요',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    maxLength: _introMaxLength,
+                    maxLines: 2,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '한 마디를 입력해 주세요';
+                      }
+                      if (value.trim().length > _introMaxLength) {
+                        return '한 마디는 $_introMaxLength자 이내로 입력해 주세요';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    '그룹 선택',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_viewModel.groupsLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_viewModel.groups.isEmpty)
+                    Text(
+                      '참여 가능한 그룹이 없습니다',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary.withValues(alpha: 0.7),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.secondary.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Column(
+                        children: _viewModel.groups.map((group) {
+                          final selected = _viewModel.selectedGroupIds
+                              .contains(group.groupId);
+                          final role =
+                              _viewModel.selectedGroupRoles[group.groupId];
+                          final narratorLocked = group.receiverId.isNotEmpty;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primary.withValues(alpha: 0.6)
+                                    : AppColors.secondary.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: selected,
+                                      onChanged: (checked) {
+                                        _viewModel.toggleGroupSelection(
+                                          group,
+                                          checked ?? false,
+                                        );
+                                      },
+                                      activeColor: AppColors.primary,
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        group.name,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    if (narratorLocked)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.secondary.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Text(
+                                          'Narrator 있음',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Opacity(
+                                  opacity: selected ? 1 : 0.4,
+                                  child: Wrap(
+                                    spacing: 8,
+                                    children: [
+                                      ChoiceChip(
+                                        label: const Text('Narrator'),
+                                        selected:
+                                            role == 'narrator' && selected,
+                                        onSelected: selected && !narratorLocked
+                                            ? (_) => _viewModel.setGroupRole(
+                                                  group.groupId,
+                                                  'narrator',
+                                                )
+                                            : null,
+                                        selectedColor: AppColors.primary,
+                                        labelStyle: TextStyle(
+                                          color: role == 'narrator' && selected
+                                              ? Colors.white
+                                              : AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      ChoiceChip(
+                                        label: const Text('Companion'),
+                                        selected:
+                                            role == 'companion' && selected,
+                                        onSelected: selected
+                                            ? (_) => _viewModel.setGroupRole(
+                                                  group.groupId,
+                                                  'companion',
+                                                )
+                                            : null,
+                                        selectedColor: AppColors.primary,
+                                        labelStyle: TextStyle(
+                                          color: role == 'companion' && selected
+                                              ? Colors.white
+                                              : AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
                   // Submit Button
                   SizedBox(
                     width: double.infinity,
@@ -247,7 +443,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -258,8 +455,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_viewModel.selectedGroupIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('그룹을 최소 1개 선택해 주세요'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+      return;
+    }
+    final missingRole = _viewModel.selectedGroupIds.any(
+      (id) => !_viewModel.selectedGroupRoles.containsKey(id),
+    );
+    if (missingRole) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('각 그룹의 역할을 선택해 주세요'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+      return;
+    }
 
-    final error = await _viewModel.submitProfile(_nameController.text.trim());
+    final error = await _viewModel.submitProfile(
+      _nameController.text.trim(),
+      _introController.text.trim(),
+    );
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(

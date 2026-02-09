@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'api_client.dart';
 
 /// Agora Voice Call Service
 ///
@@ -21,7 +22,6 @@ class AgoraService {
   bool _isInChannel = false;
   bool _isMuted = false;
   bool _isSpeakerOn = true;
-  String? _currentChannelName;
   Future<bool>? _initializeFuture;
   String? _logFilePath;
 
@@ -31,7 +31,6 @@ class AgoraService {
   Function(String message)? onError;
   Function()? onJoinChannelSuccess;
   Function()? onLeaveChannel;
-  Function(RtcConnection connection, RtcStats stats)? onRtcStats;
 
   // Getters
   bool get isInitialized => _isInitialized;
@@ -122,9 +121,6 @@ class AgoraService {
             final merged = msg.trim().isEmpty ? '$err' : '$err - $msg';
             onError?.call(merged);
           },
-          onRtcStats: (connection, stats) {
-            onRtcStats?.call(connection, stats);
-          },
         ),
       );
 
@@ -177,7 +173,6 @@ class AgoraService {
   Future<void> _resetAfterInitFailure() async {
     _isInitialized = false;
     _isInChannel = false;
-    _currentChannelName = null;
     if (_engine != null) {
       try {
         await _engine!.release();
@@ -297,8 +292,6 @@ class AgoraService {
     }
 
     try {
-      _currentChannelName = channelName;
-
       // Join channel
       await _engine!.joinChannel(
         token: token,
@@ -315,7 +308,6 @@ class AgoraService {
     } catch (e) {
       debugPrint('Agora: Join channel failed - $e');
       onError?.call('채널 참가 실패: $e');
-      _currentChannelName = null;
       return false;
     }
   }
@@ -331,58 +323,30 @@ class AgoraService {
     String role = 'publisher',
     int? expireSeconds,
   }) async {
-    try {
-      final uri = Uri.parse('$apiBaseUrl/api/token');
-      final requestBody = jsonEncode(<String, dynamic>{
-        'channel': channelName,
-        'uid': uid,
-        if (userAccount != null && userAccount.isNotEmpty)
-          'user_account': userAccount,
-        'role': role,
-        if (expireSeconds != null) 'expire': expireSeconds,
-      });
+    final url = '$apiBaseUrl/api/token';
+    final body = <String, dynamic>{
+      'channel': channelName,
+      'uid': uid,
+      if (userAccount != null && userAccount.isNotEmpty)
+        'user_account': userAccount,
+      'role': role,
+      if (expireSeconds != null) 'expire': expireSeconds,
+    };
 
-      debugPrint('=== fetchToken START ===');
-      debugPrint('URL: $uri');
-      debugPrint('Method: POST');
-      debugPrint('Request Body: $requestBody');
+    debugPrint('=== fetchToken START === $url');
+    final json = await ApiClient.instance.postJson(url, body);
+    debugPrint('=== fetchToken END === result: $json');
 
-      final client = HttpClient();
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(requestBody);
-
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      client.close();
-
-      debugPrint('Response Status: ${response.statusCode}');
-      debugPrint('Response Body: $body');
-      debugPrint('=== fetchToken END ===');
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        onError?.call('토큰 서버 오류: ${response.statusCode}');
-        return null;
-      }
-
-      final json = jsonDecode(body);
-      if (json is Map) {
-        if (json['token'] is String) {
-          debugPrint('Token fetched successfully!');
-          return json['token'] as String;
-        }
-        if (json['rtcToken'] is String) {
-          debugPrint('Token (rtcToken) fetched successfully!');
-          return json['rtcToken'] as String;
-        }
-      }
-
-      onError?.call('토큰 응답 형식 오류');
-      return null;
-    } catch (e) {
-      onError?.call('토큰 요청 실패: $e');
+    if (json == null) {
+      onError?.call('토큰 서버 오류');
       return null;
     }
+
+    if (json['token'] is String) return json['token'] as String;
+    if (json['rtcToken'] is String) return json['rtcToken'] as String;
+
+    onError?.call('토큰 응답 형식 오류');
+    return null;
   }
 
   // ============================================================================
@@ -397,13 +361,8 @@ class AgoraService {
     String? callerId,
     String? receiverId,
   }) async {
-    try {
-      final uri = Uri.parse('$apiBaseUrl/api/recording/start');
-      final client = HttpClient();
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(
-        jsonEncode(<String, dynamic>{
+    final ok = await ApiClient.instance
+        .postJsonOk('$apiBaseUrl/api/recording/start', <String, dynamic>{
           'channel': channelName,
           if (token != null && token.isNotEmpty) 'token': token,
           'uid': uid,
@@ -411,21 +370,11 @@ class AgoraService {
           if (callerId != null && callerId.isNotEmpty) 'caller_id': callerId,
           if (receiverId != null && receiverId.isNotEmpty)
             'receiver_id': receiverId,
-        }),
-      );
-      final response = await request.close();
-      await response.transform(utf8.decoder).join();
-      client.close();
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        onError?.call('레코딩 start 실패: ${response.statusCode}');
-        return false;
-      }
-      return true;
-    } catch (e) {
-      onError?.call('레코딩 start 요청 실패: $e');
-      return false;
+        });
+    if (!ok) {
+      onError?.call('레코딩 start 실패');
     }
+    return ok;
   }
 
   Future<bool> stopServerRecording({
@@ -433,27 +382,14 @@ class AgoraService {
     required String channelName,
     required int uid,
   }) async {
-    try {
-      final uri = Uri.parse('$apiBaseUrl/api/recording/stop');
-      final client = HttpClient();
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(
-        jsonEncode(<String, dynamic>{'channel': channelName, 'uid': uid}),
-      );
-      final response = await request.close();
-      await response.transform(utf8.decoder).join();
-      client.close();
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        onError?.call('레코딩 stop 실패: ${response.statusCode}');
-        return false;
-      }
-      return true;
-    } catch (e) {
-      onError?.call('레코딩 stop 요청 실패: $e');
-      return false;
+    final ok = await ApiClient.instance.postJsonOk(
+      '$apiBaseUrl/api/recording/stop',
+      <String, dynamic>{'channel': channelName, 'uid': uid},
+    );
+    if (!ok) {
+      onError?.call('레코딩 stop 실패');
     }
+    return ok;
   }
 
   // ============================================================================
@@ -465,7 +401,6 @@ class AgoraService {
     try {
       await _engine!.leaveChannel();
       _isInChannel = false;
-      _currentChannelName = null;
     } catch (e) {
       debugPrint('Agora: Leave channel failed - $e');
     }
@@ -474,13 +409,6 @@ class AgoraService {
   // ============================================================================
   // Mute/Unmute
   // ============================================================================
-  Future<void> toggleMute() async {
-    if (_engine == null) return;
-
-    _isMuted = !_isMuted;
-    await _engine!.muteLocalAudioStream(_isMuted);
-  }
-
   Future<void> setMuted(bool muted) async {
     if (_engine == null) return;
 
@@ -488,29 +416,37 @@ class AgoraService {
     await _engine!.muteLocalAudioStream(_isMuted);
   }
 
-  Future<void> muteLocalAudio(bool muted) async {
-    await setMuted(muted);
-  }
-
   // ============================================================================
   // Speaker On/Off
   // ============================================================================
   Future<void> toggleSpeaker() async {
-    if (_engine == null) return;
+    if (_engine == null || !_isInitialized) return;
 
     _isSpeakerOn = !_isSpeakerOn;
-    await _engine!.setEnableSpeakerphone(_isSpeakerOn);
+    try {
+      await _engine!.setEnableSpeakerphone(_isSpeakerOn);
+    } on AgoraRtcException catch (e) {
+      debugPrint(
+        'Agora: setEnableSpeakerphone failed (code=${e.code}, message=${e.message})',
+      );
+    } catch (e) {
+      debugPrint('Agora: setEnableSpeakerphone failed ($e)');
+    }
   }
 
   Future<void> setSpeakerOn(bool speakerOn) async {
-    if (_engine == null) return;
+    if (_engine == null || !_isInitialized) return;
 
     _isSpeakerOn = speakerOn;
-    await _engine!.setEnableSpeakerphone(_isSpeakerOn);
-  }
-
-  Future<void> setSpeakerphoneOn(bool speakerOn) async {
-    await setSpeakerOn(speakerOn);
+    try {
+      await _engine!.setEnableSpeakerphone(_isSpeakerOn);
+    } on AgoraRtcException catch (e) {
+      debugPrint(
+        'Agora: setEnableSpeakerphone failed (code=${e.code}, message=${e.message})',
+      );
+    } catch (e) {
+      debugPrint('Agora: setEnableSpeakerphone failed ($e)');
+    }
   }
 
   // ============================================================================
@@ -527,7 +463,6 @@ class AgoraService {
     }
 
     _isInitialized = false;
-    _currentChannelName = null;
     _initializeFuture = null;
     _logFilePath = null;
   }

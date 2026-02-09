@@ -13,6 +13,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsViewModel _viewModel = SettingsViewModel();
+  static const int _introMaxLength = 50;
 
   @override
   void initState() {
@@ -119,6 +120,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('이메일이 변경되었습니다')));
+    }
+  }
+
+  Future<void> _showEditIntroDialog() async {
+    final user = _viewModel.user;
+    if (user == null) return;
+
+    final controller = TextEditingController(text: user.introMessage);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('한 마디 변경'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: '한 마디를 입력하세요'),
+          maxLines: 2,
+          maxLength: _introMaxLength,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+
+    final trimmed = result?.trim() ?? '';
+    if (trimmed.isEmpty) return;
+    if (trimmed.length > _introMaxLength) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('한 마디는 $_introMaxLength자 이내로 입력해 주세요')),
+        );
+      }
+      return;
+    }
+    if (trimmed != user.introMessage) {
+      final error = await _viewModel.updateIntroMessage(trimmed);
+      if (!mounted) return;
+      if (error != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('한 마디가 변경되었습니다')));
     }
   }
 
@@ -293,6 +348,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.textSecondary,
             ),
           ),
+          if ((_viewModel.user?.introMessage ?? '').isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _viewModel.user!.introMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary.withValues(alpha: 0.9),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
         ],
       ),
@@ -324,6 +390,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.person_outline,
             title: '이름 변경',
             onTap: _showEditNameDialog,
+          ),
+          _buildSettingItem(
+            icon: Icons.message_outlined,
+            title: '한 마디 변경',
+            onTap: _showEditIntroDialog,
           ),
           _buildSettingItem(
             icon: Icons.phone_outlined,

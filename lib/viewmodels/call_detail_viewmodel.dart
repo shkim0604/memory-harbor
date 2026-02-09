@@ -10,9 +10,11 @@ class CallDetailViewModel {
   CallDetailStatus status = CallDetailStatus.loading;
   List<String> keywords = const [];
   List<Call> previousCalls = const [];
+  String receiverName = '';
 
   StreamSubscription<List<ResidenceStats>>? _statsSub;
   StreamSubscription<List<Call>>? _callsSub;
+  StreamSubscription<CareReceiver?>? _receiverSub;
   void Function()? _onChanged;
 
   void init({
@@ -21,24 +23,33 @@ class CallDetailViewModel {
     required void Function() onChanged,
   }) {
     _onChanged = onChanged;
+
+    // Load receiver name.
+    _receiverSub = CareReceiverService.instance
+        .streamReceiver(receiverId)
+        .listen((receiver) {
+          receiverName = receiver?.name ?? '';
+          _onChanged?.call();
+        });
+
     _statsSub = CareReceiverService.instance
         .streamResidenceStats(receiverId)
         .listen((statsList) {
-      final stats = statsList.firstWhere(
-        (s) => s.residenceId == residenceId,
-        orElse: () => const ResidenceStats(
-          groupId: '',
-          receiverId: '',
-          residenceId: '',
-        ),
-      );
-      keywords = stats.keywords;
-      _onChanged?.call();
-    });
+          final stats = statsList.firstWhere(
+            (s) => s.residenceId == residenceId,
+            orElse: () => const ResidenceStats(
+              groupId: '',
+              receiverId: '',
+              residenceId: '',
+            ),
+          );
+          keywords = stats.keywords;
+          _onChanged?.call();
+        });
 
-    _callsSub = CallService.instance
-        .streamCallsByReceiver(receiverId)
-        .listen((calls) {
+    _callsSub = CallService.instance.streamCallsByReceiver(receiverId).listen((
+      calls,
+    ) {
       previousCalls = calls
           .where(
             (call) => call.mentionedResidences.any(
@@ -54,6 +65,7 @@ class CallDetailViewModel {
   void dispose() {
     _statsSub?.cancel();
     _callsSub?.cancel();
+    _receiverSub?.cancel();
     _onChanged = null;
   }
 }

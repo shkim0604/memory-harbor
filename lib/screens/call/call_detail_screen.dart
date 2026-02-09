@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../viewmodels/call_detail_viewmodel.dart';
+import '../../viewmodels/call_session_viewmodel.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/time_utils.dart';
+import '../../widgets/call_status_indicator.dart';
+import '../../widgets/memo_bottom_sheet.dart';
 
 class CallDetailScreen extends StatefulWidget {
   final String residenceId;
@@ -27,17 +30,15 @@ class CallDetailScreen extends StatefulWidget {
 class _CallDetailScreenState extends State<CallDetailScreen>
     with TickerProviderStateMixin {
   final CallDetailViewModel _viewModel = CallDetailViewModel();
+  final CallSessionViewModel _session = CallSessionViewModel.instance;
   final PageController _carouselController = PageController(
     viewportFraction: 0.85,
   );
   late AnimationController _keywordAnimController;
+  late final VoidCallback _onSessionChanged;
 
   // 현재 통화 키워드
   List<String> _currentKeywords = [];
-
-  // 통화 상태
-  bool _isMuted = false;
-  bool _isSpeaker = false;
 
   @override
   void initState() {
@@ -46,6 +47,10 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
+    _onSessionChanged = () {
+      if (mounted) setState(() {});
+    };
+    _session.addListener(_onSessionChanged);
     // 빈 상태로 시작 - 사용자가 수동으로 추가
     _currentKeywords = [];
     _viewModel.init(
@@ -59,6 +64,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
 
   @override
   void dispose() {
+    _session.removeListener(_onSessionChanged);
     _carouselController.dispose();
     _keywordAnimController.dispose();
     _viewModel.dispose();
@@ -66,8 +72,9 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   }
 
   void _showAddKeywordSheet(List<String> allKeywords) {
-    final availableKeywords =
-        allKeywords.where((k) => !_currentKeywords.contains(k)).toList();
+    final availableKeywords = allKeywords
+        .where((k) => !_currentKeywords.contains(k))
+        .toList();
     final customController = TextEditingController();
 
     showModalBottomSheet(
@@ -247,9 +254,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       body: Column(
         children: [
           _buildKeywordsCard(_viewModel.keywords),
-          Expanded(
-            child: _buildPreviousCallsSection(_viewModel.previousCalls),
-          ),
+          Expanded(child: _buildPreviousCallsSection(_viewModel.previousCalls)),
           _buildCallStatusBar(),
         ],
       ),
@@ -260,6 +265,20 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // 하단 통화 상태창
   // ============================================================
   Widget _buildCallStatusBar() {
+    final isOnCall = _session.status == CallSessionState.onCall;
+    final isEnded = _session.status == CallSessionState.ended;
+    final statusText = switch (_session.status) {
+      CallSessionState.connecting => '연결 중',
+      CallSessionState.onCall => '통화 중',
+      CallSessionState.ended => '종료됨',
+    };
+    final statusColor = switch (_session.status) {
+      CallSessionState.connecting => AppColors.connecting,
+      CallSessionState.onCall => AppColors.onCall,
+      CallSessionState.ended => AppColors.ended,
+    };
+    final receiverName = _viewModel.receiverName;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
@@ -287,10 +306,10 @@ class _CallDetailScreenState extends State<CallDetailScreen>
                   height: 8,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.onCall,
+                    color: statusColor,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.onCall.withValues(alpha: 0.5),
+                        color: statusColor.withValues(alpha: 0.5),
                         blurRadius: 6,
                         spreadRadius: 2,
                       ),
@@ -298,47 +317,57 @@ class _CallDetailScreenState extends State<CallDetailScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  '통화 중',
-                  style: TextStyle(
+                Text(
+                  statusText,
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Text(
-                  '12:34',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w300,
-                    color: Colors.white70,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const Spacer(),
-                // 케어리시버 프로필
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.onCall, width: 2),
-                    image: const DecorationImage(
-                      image: AssetImage('assets/images/logo.png'),
-                      fit: BoxFit.cover,
+                if (isOnCall) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    _session.formattedDuration,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w300,
+                      color: Colors.white70,
+                      letterSpacing: 2,
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  '김순자 할머니',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                ],
+                const Spacer(),
+                if (receiverName.isNotEmpty) ...[
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: statusColor, width: 2),
+                      color: Colors.white.withValues(alpha: 0.15),
+                    ),
+                    child: Center(
+                      child: Text(
+                        receiverName.characters.first,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Text(
+                    receiverName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 14),
@@ -347,19 +376,24 @@ class _CallDetailScreenState extends State<CallDetailScreen>
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildMiniControlButton(
-                  icon: _isMuted ? Icons.mic_off : Icons.mic,
-                  isActive: _isMuted,
-                  onPressed: () => setState(() => _isMuted = !_isMuted),
+                  icon: _session.isMuted ? Icons.mic_off : Icons.mic,
+                  isActive: _session.isMuted,
+                  onPressed: _session.toggleMute,
                 ),
                 _buildMiniControlButton(
-                  icon: _isSpeaker ? Icons.volume_up : Icons.volume_down,
-                  isActive: _isSpeaker,
-                  onPressed: () => setState(() => _isSpeaker = !_isSpeaker),
+                  icon: _session.isSpeaker
+                      ? Icons.volume_up
+                      : Icons.volume_down,
+                  isActive: _session.isSpeaker,
+                  onPressed: _session.toggleSpeaker,
                 ),
                 // 통화 종료 버튼
                 GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
+                  onTap: () async {
+                    if (!isEnded) {
+                      await _session.endCall();
+                    }
+                    if (mounted) Navigator.pop(context);
                   },
                   child: Container(
                     width: 52,
@@ -424,81 +458,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   }
 
   void _showMemoBottomSheet() {
-    final memoController = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '통화 메모',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: memoController,
-                maxLines: 4,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: '통화 내용을 메모하세요...',
-                  hintStyle: TextStyle(color: AppColors.textHint),
-                  filled: true,
-                  fillColor: AppColors.surfaceVariant,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '저장',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    showMemoBottomSheet(context);
   }
 
   // ============================================================
@@ -729,16 +689,16 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   }
 
   Widget _buildSummaryCard(Call call, int index) {
-    final summaryText =
-        call.humanSummary.isNotEmpty ? call.humanSummary : call.humanNotes;
+    final summaryText = call.humanSummary.isNotEmpty
+        ? call.humanSummary
+        : call.humanNotes;
     final keywordsText = call.humanKeywords.isNotEmpty
         ? call.humanKeywords.join(', ')
         : '';
     final caregiverName = call.giverNameSnapshot.isNotEmpty
         ? call.giverNameSnapshot
         : '알 수 없음';
-    final caregiverInitial =
-        caregiverName.isNotEmpty ? caregiverName[0] : '?';
+    final caregiverInitial = caregiverName.isNotEmpty ? caregiverName[0] : '?';
     final dateText = _formatDate(call.startedAt);
     final durationText = _formatDuration(call.durationSec);
 

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-enum CallStatus { connecting, onCall, ended }
+enum CallSessionState { connecting, onCall, ended }
 
 /// 통화 상태 인디케이터
-class CallStatusIndicator extends StatelessWidget {
-  final CallStatus status;
+class CallSessionStateIndicator extends StatelessWidget {
+  final CallSessionState status;
   final String? duration;
   final bool showDuration;
 
-  const CallStatusIndicator({
+  const CallSessionStateIndicator({
     super.key,
     required this.status,
     this.duration,
@@ -18,22 +18,22 @@ class CallStatusIndicator extends StatelessWidget {
 
   Color get statusColor {
     switch (status) {
-      case CallStatus.connecting:
+      case CallSessionState.connecting:
         return AppColors.connecting;
-      case CallStatus.onCall:
+      case CallSessionState.onCall:
         return AppColors.onCall;
-      case CallStatus.ended:
+      case CallSessionState.ended:
         return AppColors.ended;
     }
   }
 
   String get statusText {
     switch (status) {
-      case CallStatus.connecting:
+      case CallSessionState.connecting:
         return '연결 중';
-      case CallStatus.onCall:
+      case CallSessionState.onCall:
         return '통화 중';
-      case CallStatus.ended:
+      case CallSessionState.ended:
         return '통화 종료';
     }
   }
@@ -68,7 +68,7 @@ class CallStatusIndicator extends StatelessWidget {
           ),
         ),
         if (showDuration &&
-            status == CallStatus.onCall &&
+            status == CallSessionState.onCall &&
             duration != null) ...[
           const SizedBox(width: 16),
           Text(

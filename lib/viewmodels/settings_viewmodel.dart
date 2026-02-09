@@ -100,6 +100,20 @@ class SettingsViewModel {
     }
   }
 
+  Future<String?> updateIntroMessage(String introMessage) async {
+    if (user == null) return '사용자 정보를 불러올 수 없습니다';
+    try {
+      await UserService.instance.updateUserIntroMessage(
+        user!.uid,
+        introMessage,
+      );
+      await loadUser();
+      return null;
+    } catch (e) {
+      return '한 마디 변경 실패: $e';
+    }
+  }
+
   Future<void> signOut() async {
     await AuthService.instance.signOut();
   }

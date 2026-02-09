@@ -6,6 +6,7 @@ import 'history/history_screen.dart';
 import 'reviews/review_write_screen.dart';
 import 'reviews/reviews_screen.dart';
 import 'settings/settings_screen.dart';
+import 'community/community_members_screen.dart';
 import '../viewmodels/call_session_viewmodel.dart';
 import '../widgets/call_status_indicator.dart';
 import '../viewmodels/app_role_viewmodel.dart';
@@ -25,9 +26,11 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
-    _roleViewModel.init(onChanged: () {
-      if (mounted) setState(() {});
-    });
+    _roleViewModel.init(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
@@ -94,10 +97,8 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CallScreen(
-          startConnecting: true,
-          onCallEnded: _goToReviewWrite,
-        ),
+        builder: (context) =>
+            CallScreen(startConnecting: true, onCallEnded: _goToReviewWrite),
       ),
     );
   }
@@ -131,10 +132,11 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
                   HomeScreen(onCallPressed: _onCallPressed),
                   const ReviewsScreen(),
                   const HistoryScreen(),
+                  const CommunityMembersScreen(),
                   const SettingsScreen(),
                 ],
               ),
-              if (_session.status != CallStatus.ended)
+              if (_session.status != CallSessionState.ended)
                 _buildCallPip(context, constraints),
             ],
           );
@@ -183,6 +185,11 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
               label: '히스토리',
             ),
             BottomNavigationBarItem(
+              icon: Icon(Icons.group_outlined),
+              activeIcon: Icon(Icons.group),
+              label: '공동체',
+            ),
+            BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
               activeIcon: Icon(Icons.settings),
               label: '설정',
@@ -198,11 +205,9 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
     const pipMinHeight = 64.0;
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final isConnecting = _session.status == CallStatus.connecting;
-    final isOnCall = _session.status == CallStatus.onCall;
-    final label = isConnecting
-        ? '연결 중...'
-        : (isOnCall ? '통화 중' : '통화 대기');
+    final isConnecting = _session.status == CallSessionState.connecting;
+    final isOnCall = _session.status == CallSessionState.onCall;
+    final label = isConnecting ? '연결 중...' : (isOnCall ? '통화 중' : '통화 대기');
 
     final availableWidth = constraints.maxWidth - (margin * 2);
     final pipWidth = availableWidth.clamp(240.0, 360.0);
@@ -211,8 +216,10 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
     final minX = margin;
     final maxX = (constraints.maxWidth - pipWidth - margin).clamp(minX, 1e9);
     final minY = margin;
-    final maxY = (constraints.maxHeight - pipMinHeight - reservedBottom)
-        .clamp(minY, 1e9);
+    final maxY = (constraints.maxHeight - pipMinHeight - reservedBottom).clamp(
+      minY,
+      1e9,
+    );
 
     final defaultOffset = Offset(minX, maxY);
     _callPipOffset ??= defaultOffset;
@@ -265,7 +272,11 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
                       shape: BoxShape.circle,
                       color: isOnCall ? AppColors.onCall : AppColors.connecting,
                     ),
-                    child: const Icon(Icons.call, color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.call,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
