@@ -36,6 +36,7 @@ class HistoryViewModel {
   Group? group;
   CareReceiver? receiver;
   List<ResidenceStats> statsList = const [];
+  List<MeaningStats> meaningStatsList = const [];
   List<Call> calls = const [];
 
   StreamSubscription<AppUser?>? _userSub;
@@ -43,6 +44,7 @@ class HistoryViewModel {
   StreamSubscription<Group?>? _receiverGroupSub;
   StreamSubscription<CareReceiver?>? _receiverSub;
   StreamSubscription<List<ResidenceStats>>? _statsSub;
+  StreamSubscription<List<MeaningStats>>? _meaningSub;
   StreamSubscription<List<Call>>? _callsSub;
 
   void init({required void Function() onChanged}) {
@@ -80,6 +82,7 @@ class HistoryViewModel {
     _receiverGroupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
+    _meaningSub?.cancel();
     _callsSub?.cancel();
   }
 
@@ -138,6 +141,7 @@ class HistoryViewModel {
       }
 
       _subscribeResidenceStats(nextReceiver.receiverId, onChanged);
+      _subscribeMeaningStats(nextReceiver.receiverId, onChanged);
       _subscribeCalls(nextReceiver.receiverId, onChanged);
     });
   }
@@ -168,15 +172,29 @@ class HistoryViewModel {
     });
   }
 
+  void _subscribeMeaningStats(String receiverId, void Function() onChanged) {
+    _meaningSub?.cancel();
+    _meaningSub = CareReceiverService.instance
+        .streamMeaningStats(receiverId)
+        .listen((nextStats) {
+      meaningStatsList = nextStats;
+      if (status == HistoryStatus.ready) {
+        onChanged();
+      }
+    });
+  }
+
   void _clearGroupState() {
     group = null;
     receiver = null;
     statsList = const [];
+    meaningStatsList = const [];
     calls = const [];
     _groupSub?.cancel();
     _receiverGroupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
+    _meaningSub?.cancel();
     _callsSub?.cancel();
   }
 
@@ -214,6 +232,30 @@ class HistoryViewModel {
               : current.lastCallerName,
         );
       }
+    }
+    return map;
+  }
+
+  Map<String, ResidenceCallSummary> get meaningCallSummaryMap {
+    final map = <String, ResidenceCallSummary>{};
+    for (final call in completedCalls) {
+      final meaningId = call.selectedMeaningId.trim().isNotEmpty
+          ? call.selectedMeaningId.trim()
+          : (call.selectedTopicType == 'meaning'
+                ? call.selectedTopicId.trim()
+                : '');
+      if (meaningId.isEmpty) continue;
+
+      final current = map[meaningId] ?? const ResidenceCallSummary();
+      final shouldUpdateLast = current.lastCallAt == null ||
+          call.startedAt.isAfter(current.lastCallAt!);
+      map[meaningId] = ResidenceCallSummary(
+        callCount: current.callCount + 1,
+        lastCallAt: shouldUpdateLast ? call.startedAt : current.lastCallAt,
+        lastCallerName: shouldUpdateLast
+            ? call.giverNameSnapshot
+            : current.lastCallerName,
+      );
     }
     return map;
   }

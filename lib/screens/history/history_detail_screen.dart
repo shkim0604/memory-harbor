@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../models/models.dart';
+import '../../services/call_service.dart';
 import '../../viewmodels/history_detail_viewmodel.dart';
 import '../../utils/time_utils.dart';
 
@@ -12,6 +13,7 @@ class HistoryDetailScreen extends StatefulWidget {
   final Color color;
   final String receiverId;
   final ResidenceStats? residenceStats;
+  final MeaningStats? meaningStats;
 
   const HistoryDetailScreen({
     super.key,
@@ -22,6 +24,7 @@ class HistoryDetailScreen extends StatefulWidget {
     required this.color,
     required this.receiverId,
     this.residenceStats,
+    this.meaningStats,
   });
 
   @override
@@ -30,6 +33,7 @@ class HistoryDetailScreen extends StatefulWidget {
 
 class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   final HistoryDetailViewModel _viewModel = HistoryDetailViewModel();
+  final Map<String, String> _summaryByCallId = {};
   Color get color => widget.color;
   String get era => widget.era;
   String get location => widget.location;
@@ -37,13 +41,18 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   String get residenceId => widget.residenceId;
   String get receiverId => widget.receiverId;
   ResidenceStats? get residenceStats => widget.residenceStats;
+  MeaningStats? get meaningStats => widget.meaningStats;
+  bool get isMeaningTopic => meaningStats != null;
 
   @override
   void initState() {
     super.initState();
     _viewModel.init(
       receiverId: widget.receiverId,
-      residenceId: widget.residenceId,
+      topicId: widget.residenceId,
+      topicType: isMeaningTopic
+          ? HistoryDetailTopicType.meaning
+          : HistoryDetailTopicType.residence,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -57,8 +66,11 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final bulletStories = residenceStats?.humanComments ?? const [];
+    final bulletStories = isMeaningTopic
+        ? (meaningStats?.humanComments ?? const [])
+        : (residenceStats?.humanComments ?? const []);
     final screenHeight = MediaQuery.of(context).size.height;
+    const headerColor = AppColors.primary;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -69,7 +81,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             expandedHeight: 120,
             floating: false,
             pinned: true,
-            backgroundColor: color,
+            backgroundColor: headerColor,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
               onPressed: () => Navigator.pop(context),
@@ -77,8 +89,10 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 location,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -88,7 +102,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [color, color.withValues(alpha: 0.7)],
+                    colors: [headerColor, AppColors.primaryDark],
                   ),
                 ),
                 child: Padding(
@@ -308,68 +322,146 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     final summary =
         call.humanSummary.isNotEmpty ? call.humanSummary : call.humanNotes;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      call.giverNameSnapshot,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+    return GestureDetector(
+      onTap: () => _showSummaryPopupForCall(call),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        call.giverNameSnapshot,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    summary,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textSecondary,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
                 Text(
-                  summary,
+                  _formatDate(call.startedAt),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textHint),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatDuration(call.durationSec),
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resolveSummaryTextFromDoc(Map<String, dynamic>? data) {
+    if (data == null) return '';
+    final summary = (data['humanSummary'] ?? '').toString().trim();
+    if (summary.isNotEmpty) return summary;
+    final notes =
+        (data['humanNotes'] ?? data['hhumanNotes'] ?? '').toString().trim();
+    if (notes.isNotEmpty) return notes;
+    return '';
+  }
+
+  Future<String> _fetchSummaryFromCallDoc(Call call) async {
+    if (call.callId.isEmpty) return '';
+    if (_summaryByCallId.containsKey(call.callId)) {
+      return _summaryByCallId[call.callId] ?? '';
+    }
+    try {
+      final data = await CallService.instance.getCallDoc(call.callId);
+      final nextText = _resolveSummaryTextFromDoc(data);
+      _summaryByCallId[call.callId] = nextText;
+      return nextText;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<void> _showSummaryPopupForCall(Call call) async {
+    final caregiverName = call.giverNameSnapshot.isNotEmpty
+        ? call.giverNameSnapshot
+        : '알 수 없음';
+    final dateText = _formatDate(call.startedAt);
+    final durationText = _formatDuration(call.durationSec);
+    var summaryText = _summaryByCallId[call.callId];
+    if (summaryText == null) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      summaryText = await _fetchSummaryFromCallDoc(call);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      setState(() {});
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(caregiverName),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _formatDate(call.startedAt),
-                style: const TextStyle(fontSize: 13, color: AppColors.textHint),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _formatDuration(call.durationSec),
+                '$dateText${durationText.isNotEmpty ? ' · $durationText' : ''}',
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
               ),
+              const SizedBox(height: 12),
+              Text(summaryText ?? ''),
             ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
           ),
         ],
       ),

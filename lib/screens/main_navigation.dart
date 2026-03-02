@@ -176,8 +176,8 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
               label: '홈',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.location_on_outlined),
-              activeIcon: Icon(Icons.location_on),
+              icon: Icon(Icons.menu_book_outlined),
+              activeIcon: Icon(Icons.menu_book),
               label: '히스토리',
             ),
             BottomNavigationBarItem(

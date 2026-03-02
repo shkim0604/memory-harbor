@@ -26,6 +26,10 @@ class Call {
   final DateTime? lastReviewAt;
   final List<Review>? reviews;
   final bool isConfirmed;
+  final String selectedTopicType;
+  final String selectedTopicId;
+  final String selectedResidenceId;
+  final String selectedMeaningId;
 
   const Call({
     required this.callId,
@@ -50,6 +54,10 @@ class Call {
     this.lastReviewAt,
     this.reviews,
     this.isConfirmed = false,
+    this.selectedTopicType = '',
+    this.selectedTopicId = '',
+    this.selectedResidenceId = '',
+    this.selectedMeaningId = '',
   });
 
   factory Call.fromJson(Map<String, dynamic> json) => Call(
@@ -86,6 +94,10 @@ class Call {
               .toList()
         : null,
     isConfirmed: (json['isConfirmed'] ?? false) as bool,
+    selectedTopicType: (json['selectedTopicType'] ?? '') as String,
+    selectedTopicId: (json['selectedTopicId'] ?? '') as String,
+    selectedResidenceId: (json['selectedResidenceId'] ?? '') as String,
+    selectedMeaningId: (json['selectedMeaningId'] ?? '') as String,
   );
 
   Map<String, dynamic> toJson() => {
@@ -111,6 +123,10 @@ class Call {
     'reviewCount': reviewCount,
     'lastReviewAt': lastReviewAt?.toIso8601String(),
     'isConfirmed': isConfirmed,
+    'selectedTopicType': selectedTopicType,
+    'selectedTopicId': selectedTopicId,
+    'selectedResidenceId': selectedResidenceId,
+    'selectedMeaningId': selectedMeaningId,
   };
 
   Call copyWith({
@@ -128,6 +144,10 @@ class Call {
     DateTime? lastReviewAt,
     List<Review>? reviews,
     bool? isConfirmed,
+    String? selectedTopicType,
+    String? selectedTopicId,
+    String? selectedResidenceId,
+    String? selectedMeaningId,
   }) {
     return Call(
       callId: callId,
@@ -152,6 +172,10 @@ class Call {
       lastReviewAt: lastReviewAt ?? this.lastReviewAt,
       reviews: reviews ?? this.reviews,
       isConfirmed: isConfirmed ?? this.isConfirmed,
+      selectedTopicType: selectedTopicType ?? this.selectedTopicType,
+      selectedTopicId: selectedTopicId ?? this.selectedTopicId,
+      selectedResidenceId: selectedResidenceId ?? this.selectedResidenceId,
+      selectedMeaningId: selectedMeaningId ?? this.selectedMeaningId,
     );
   }
 }
