@@ -1,14 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum CallStatus { completed, canceled, missed, declined, failed }
+enum CallStatus { completed, cancelled, missed, declined, failed }
 
 CallStatus callStatusFromString(String v) {
   switch (v) {
     case 'completed':
       return CallStatus.completed;
-    case 'canceled':
-    case 'cancelled': // British spelling variant used by server
-      return CallStatus.canceled;
+    case 'cancelled':
+      return CallStatus.cancelled;
     case 'missed':
       return CallStatus.missed;
     case 'declined':
@@ -24,8 +23,8 @@ String callStatusToString(CallStatus s) {
   switch (s) {
     case CallStatus.completed:
       return 'completed';
-    case CallStatus.canceled:
-      return 'canceled';
+    case CallStatus.cancelled:
+      return 'cancelled';
     case CallStatus.missed:
       return 'missed';
     case CallStatus.declined:

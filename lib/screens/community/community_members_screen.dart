@@ -42,16 +42,8 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        title: const Text(
-          '공동체 구성원',
-          style: TextStyle(
-            color: AppColors.secondary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: AppColors.secondary),
+        title: const Text('공동체 구성원'),
+        centerTitle: true,
       ),
       body: Stack(
         children: [

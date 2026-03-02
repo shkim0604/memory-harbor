@@ -1,5 +1,8 @@
 import '../config/agora_config.dart';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
+
+const String _tag = '[CIV]'; // CallInviteService log prefix
 
 class CallInviteResult {
   final String callId;
@@ -22,6 +25,9 @@ class CallInviteService {
     String? groupNameSnapshot,
     String? receiverNameSnapshot,
   }) async {
+    debugPrint(
+      '$_tag inviteCall request: caller=$callerId receiver=$receiverId group=$groupId',
+    );
     if (_baseUrl.isEmpty) return null;
     final json = await ApiClient.instance
         .postJson('$_baseUrl/api/call/invite', <String, dynamic>{
@@ -40,8 +46,10 @@ class CallInviteService {
     final callId = (json['callId'] ?? '') as String;
     final channelName = (json['channelName'] ?? '') as String;
     if (callId.isNotEmpty && channelName.isNotEmpty) {
+      debugPrint('$_tag inviteCall success: callId=$callId channel=$channelName');
       return CallInviteResult(callId: callId, channelName: channelName);
     }
+    debugPrint('$_tag inviteCall invalid response: $json');
     return null;
   }
 
@@ -66,6 +74,8 @@ class CallInviteService {
 
   Future<bool> _postOk(String path, Map<String, dynamic> body) async {
     if (_baseUrl.isEmpty) return false;
-    return ApiClient.instance.postJsonOk('$_baseUrl$path', body);
+    final ok = await ApiClient.instance.postJsonOk('$_baseUrl$path', body);
+    debugPrint('$_tag postOk path=$path ok=$ok body=$body');
+    return ok;
   }
 }

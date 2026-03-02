@@ -12,8 +12,6 @@ lib/
     agora_config.dart      # Agora appId + API base URL
   utils/
     time_utils.dart        # Timezone helpers (America/New_York)
-  data/
-    mock_data.dart         # Local seed data for UI development
   firebase/
     firebase_config.dart        # Env + emulator routing for Firebase
     firebase_options_dev.dart   # Dev Firebase options (generated)
@@ -27,7 +25,6 @@ lib/
     care_receiver_service.dart  # Care receiver CRUD
     group_service.dart      # Group CRUD
     permission_service.dart # Runtime permission requests
-    seed_service.dart       # Emulator seed helper
     storage_service.dart    # Storage upload/download
     agora_service.dart      # Agora RTC + server recording bridge
     call_notification_service.dart # FCM + CallKit incoming call handling
@@ -210,6 +207,5 @@ This project requires **JDK 17** for Android builds. Ensure Gradle uses JDK 17:
 
 ## Notes
 
-- `lib/data/mock_data.dart` is used for UI scaffolding and demo data.
 - The domain models in `lib/models/` are plain Dart models, designed to be
   firestore-friendly (json serialization + snapshots).

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../models/models.dart';
-import '../../widgets/widgets.dart';
 import '../../viewmodels/history_detail_viewmodel.dart';
 import '../../utils/time_utils.dart';
 
@@ -58,8 +57,8 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    final keywords = residenceStats?.keywords ?? const [];
     final bulletStories = residenceStats?.humanComments ?? const [];
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -79,7 +78,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               title: Text(
                 location,
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -108,7 +107,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                         child: Text(
                           era,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             color: Colors.white,
                           ),
                         ),
@@ -117,7 +116,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                       Text(
                         detail,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: Colors.white70,
                         ),
                       ),
@@ -131,21 +130,20 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
           // 콘텐츠
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // (1) 키워드 섹션
-                  _buildKeywordsSection(keywords),
-                  const SizedBox(height: 24),
+                  // (1) 불릿 스토리 섹션
+                  _buildBulletStoriesSection(
+                    bulletStories,
+                    screenHeight: screenHeight,
+                  ),
+                  const SizedBox(height: 18),
 
-                  // (2) 불릿 스토리 섹션
-                  _buildBulletStoriesSection(bulletStories),
-                  const SizedBox(height: 24),
-
-                  // (3) 통화 내역 섹션
-                  _buildCallHistorySection(),
-                  const SizedBox(height: 20),
+                  // (2) 통화 내역 섹션
+                  _buildCallHistorySection(screenHeight: screenHeight),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
@@ -155,79 +153,14 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     );
   }
 
-  Widget _buildKeywordsSection(List<String> keywords) {
-    final chipColors = [
-      color,
-      AppColors.secondary,
-      AppColors.accent,
-      AppColors.primaryDark,
-      AppColors.primary,
-    ];
-
+  Widget _buildBulletStoriesSection(
+    List<String> stories, {
+    required double screenHeight,
+  }) {
+    final storyMinHeight = (screenHeight * 0.30).clamp(220.0, 360.0);
+    final storyMaxHeight = (screenHeight * 0.56).clamp(360.0, 700.0);
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.tag, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                '주요 키워드',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${keywords.length}개',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: keywords.asMap().entries.map((entry) {
-              return KeywordChip(
-                keyword: entry.value,
-                color: chipColors[entry.key % chipColors.length],
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBulletStoriesSection(List<String> stories) {
-    return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -244,23 +177,10 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.auto_stories,
-                  color: AppColors.accent,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
               const Text(
                 '추억 스토리',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
@@ -268,12 +188,37 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               const Spacer(),
               Text(
                 '통화 내용 기반',
-                style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                style: TextStyle(fontSize: 13, color: AppColors.textHint),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          ...stories.map((story) => _buildStoryItem(story)).toList(),
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: storyMinHeight,
+              maxHeight: storyMaxHeight,
+            ),
+            child: Scrollbar(
+              thumbVisibility: stories.length > 3,
+              child: SingleChildScrollView(
+                child: stories.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Text(
+                          '아직 정리된 추억 스토리가 없습니다.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                            height: 1.5,
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: stories.map((story) => _buildStoryItem(story)).toList(),
+                      ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -299,7 +244,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 Text(
                   story,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     color: AppColors.textSecondary,
                     height: 1.5,
                   ),
@@ -312,29 +257,18 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     );
   }
 
-  Widget _buildCallHistorySection() {
+  Widget _buildCallHistorySection({required double screenHeight}) {
+    final calls = _viewModel.filteredCalls;
+    final cardHeight = (screenHeight * 0.15).clamp(100.0, 136.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.history,
-                color: AppColors.secondary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              '통화 내역',
-              style: TextStyle(
-                fontSize: 16,
+            Text(
+              '통화 내역: ${calls.length}건',
+              style: const TextStyle(
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
@@ -342,26 +276,30 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             const Spacer(),
           ],
         ),
-        const SizedBox(height: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '${_viewModel.filteredCalls.length}건',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+        const SizedBox(height: 8),
+        if (calls.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              '통화 내역이 없습니다.',
+              style: TextStyle(fontSize: 14, color: AppColors.textHint),
             ),
-            const SizedBox(height: 8),
-            ..._viewModel.filteredCalls
-                .map((call) => _buildCallHistoryCard(call))
-                .toList(),
-          ],
-        ),
+          )
+        else
+          SizedBox(
+            height: cardHeight,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: calls.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                return SizedBox(
+                  width: 286,
+                  child: _buildCallHistoryCard(calls[index]),
+                );
+              },
+            ),
+          ),
       ],
     );
   }
@@ -386,13 +324,6 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
       ),
       child: Row(
         children: [
-          ProfileAvatar(
-            imageUrl: null,
-            fallbackText: call.giverNameSnapshot,
-            size: 44,
-            backgroundColor: AppColors.primaryLight.withValues(alpha: 0.3),
-          ),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,7 +333,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                     Text(
                       call.giverNameSnapshot,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -413,7 +344,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 Text(
                   summary,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 15,
                     color: AppColors.textSecondary,
                   ),
                   maxLines: 1,
@@ -427,13 +358,13 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             children: [
               Text(
                 _formatDate(call.startedAt),
-                style: const TextStyle(fontSize: 12, color: AppColors.textHint),
+                style: const TextStyle(fontSize: 13, color: AppColors.textHint),
               ),
               const SizedBox(height: 2),
               Text(
                 _formatDuration(call.durationSec),
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textSecondary,
                 ),
@@ -450,14 +381,14 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     final duration = Duration(seconds: seconds);
     final totalMinutes = duration.inMinutes;
     if (totalMinutes < 60) {
-      return '${totalMinutes}분';
+      return '$totalMinutes분';
     }
     final hours = duration.inHours;
     final minutes = totalMinutes % 60;
     if (minutes == 0) {
-      return '${hours}시간';
+      return '$hours시간';
     }
-    return '${hours}시간 ${minutes}분';
+    return '$hours시간 $minutes분';
   }
 
   String _formatDate(DateTime dateTime) {

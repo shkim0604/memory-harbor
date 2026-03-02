@@ -18,6 +18,18 @@ enum HistoryStatus {
   ready,
 }
 
+class ResidenceCallSummary {
+  final int callCount;
+  final DateTime? lastCallAt;
+  final String lastCallerName;
+
+  const ResidenceCallSummary({
+    this.callCount = 0,
+    this.lastCallAt,
+    this.lastCallerName = '',
+  });
+}
+
 class HistoryViewModel {
   HistoryStatus status = HistoryStatus.loadingUser;
   User? firebaseUser;
@@ -182,5 +194,27 @@ class HistoryViewModel {
               call.startedAt.isAfter(now.subtract(const Duration(days: 7))),
         )
         .length;
+  }
+
+  Map<String, ResidenceCallSummary> get residenceCallSummaryMap {
+    final map = <String, ResidenceCallSummary>{};
+    for (final call in completedCalls) {
+      final mentioned = call.mentionedResidences;
+      if (mentioned.isEmpty) continue;
+      for (final residence in mentioned) {
+        if (residence.residenceId.isEmpty) continue;
+        final current = map[residence.residenceId] ?? const ResidenceCallSummary();
+        final shouldUpdateLast = current.lastCallAt == null ||
+            call.startedAt.isAfter(current.lastCallAt!);
+        map[residence.residenceId] = ResidenceCallSummary(
+          callCount: current.callCount + 1,
+          lastCallAt: shouldUpdateLast ? call.startedAt : current.lastCallAt,
+          lastCallerName: shouldUpdateLast
+              ? call.giverNameSnapshot
+              : current.lastCallerName,
+        );
+      }
+    }
+    return map;
   }
 }

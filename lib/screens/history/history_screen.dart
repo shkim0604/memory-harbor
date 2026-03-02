@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import 'history_detail_screen.dart';
 import '../../viewmodels/history_viewmodel.dart';
+import '../../utils/time_utils.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -18,9 +18,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _viewModel.init(onChanged: () {
-      if (mounted) setState(() {});
-    });
+    _viewModel.init(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
@@ -63,9 +65,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text("${receiver.name}'s Life"),
+        centerTitle: true,
+      ),
       body: _buildHistoryBody(
         receiver,
-        _viewModel.totalCompletedCalls,
         _viewModel.statsList,
       ),
     );
@@ -73,88 +78,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildHistoryBody(
     CareReceiver receiver,
-    int totalCalls,
     List<ResidenceStats> statsList,
   ) {
+    final summaryMap = _viewModel.residenceCallSummaryMap;
     return CustomScrollView(
       slivers: [
-        SliverAppBar(
-          expandedHeight: 140,
-          floating: false,
-          pinned: true,
-          backgroundColor: AppColors.secondary,
-          flexibleSpace: FlexibleSpaceBar(
-            title: const Text(
-              '추억 히스토리',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            background: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.secondary, AppColors.secondaryLight],
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 60, 20, 50),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                        image: receiver.profileImage.isNotEmpty
-                            ? DecorationImage(
-                                image: receiver.profileImage.startsWith('assets/')
-                                    ? AssetImage(receiver.profileImage)
-                                        as ImageProvider
-                                    : NetworkImage(receiver.profileImage),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      child: receiver.profileImage.isEmpty
-                          ? const Icon(Icons.person, color: Colors.white)
-                          : null,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            receiver.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '총 ${totalCalls}회 통화 · ${statsList.length}개 시대',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverList(
@@ -170,7 +98,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 context,
                 residence,
                 stats,
+                summaryMap[stats.residenceId],
                 receiver.receiverId,
+                index,
+                statsList.length,
               );
             }, childCount: statsList.length),
           ),
@@ -183,9 +114,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     BuildContext context,
     Residence residence,
     ResidenceStats? residenceStats,
+    ResidenceCallSummary? callSummary,
     String receiverId,
+    int index,
+    int totalCount,
   ) {
-    final residenceUi = MockData.getResidenceUi(residence);
+    final residenceColor = _residenceColorByOrder(index, totalCount);
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -196,7 +130,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               era: residence.era,
               location: residence.location,
               detail: residence.detail,
-              color: residenceUi.color,
+              color: residenceColor,
               receiverId: receiverId,
               residenceStats: residenceStats,
             ),
@@ -210,7 +144,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: residenceUi.color.withValues(alpha: 0.2),
+              color: residenceColor.withValues(alpha: 0.2),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -222,7 +156,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Container(
               height: 6,
               decoration: BoxDecoration(
-                color: residenceUi.color,
+                color: residenceColor,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
@@ -232,21 +166,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  // 아이콘
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: residenceUi.color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      residenceUi.icon,
-                      color: residenceUi.color,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   // 정보
                   Expanded(
                     child: Column(
@@ -258,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: residenceUi.color.withValues(alpha: 0.15),
+                            color: residenceColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -266,7 +185,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: residenceUi.color,
+                              color: residenceColor,
                             ),
                           ),
                         ),
@@ -317,19 +236,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${residenceStats?.totalCalls ?? 0}회',
+                          '${callSummary?.callCount ?? 0}회',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        color: AppColors.textHint,
-                        size: 16,
                       ),
                     ],
                   ),
@@ -347,13 +260,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.access_time, size: 14, color: AppColors.textHint),
-                  const SizedBox(width: 4),
                   Text(
-                    '마지막 통화: ${residenceStats?.lastCallAt != null ? MockData.formatDate(residenceStats!.lastCallAt!) : '-'}',
+                    '마지막 통화: ${callSummary?.lastCallAt != null ? _formatDate(callSummary!.lastCallAt!) : '-'}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Flexible(
+                    child: Text(
+                      callSummary?.lastCallerName.isNotEmpty == true
+                          ? callSummary!.lastCallerName
+                          : '-',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -363,5 +287,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+
+  Color _residenceColorByOrder(int index, int totalCount) {
+    if (totalCount <= 1) return AppColors.primary;
+    final clamped = index.clamp(0, totalCount - 1);
+    final t = clamped / (totalCount - 1);
+    return Color.lerp(AppColors.primaryLight, AppColors.primaryDark, t) ??
+        AppColors.primary;
+  }
+
+  String _formatDate(DateTime dateTime) {
+    final et = TimeUtils.toEt(dateTime);
+    return '${et.year}.${et.month.toString().padLeft(2, '0')}.${et.day.toString().padLeft(2, '0')}';
   }
 }

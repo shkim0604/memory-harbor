@@ -7,7 +7,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import 'firebase_options_dev.dart' as dev;
 import 'firebase_options_prod.dart' as prod;
-import '../services/seed_service.dart';
 
 enum AppEnv { emul, dev, prod }
 
@@ -67,15 +66,6 @@ class FirebaseConfig {
     FirebaseFirestore.instance.useFirestoreEmulator(host, 8081);
     FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
     FirebaseStorage.instance.useStorageEmulator(host, 9198);
-
-    try {
-      await SeedService.instance.seedIfNeeded();
-    } catch (e, st) {
-      // If the emulator is unreachable (common on physical devices without
-      // EMULATOR_HOST), don't crash the app during startup.
-      debugPrint('SeedService.seedIfNeeded failed: $e');
-      debugPrint('$st');
-    }
   }
 
   static String get _emulatorHost {
