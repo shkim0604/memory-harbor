@@ -4,7 +4,6 @@ import 'home/home_screen.dart';
 import 'call/call_screen.dart';
 import 'history/history_screen.dart';
 import 'reviews/review_write_screen.dart';
-import 'reviews/reviews_screen.dart';
 import 'settings/settings_screen.dart';
 import 'community/community_members_screen.dart';
 import '../viewmodels/call_session_viewmodel.dart';
@@ -103,7 +102,7 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
     );
   }
 
-  void _goToReviews() {
+  void _goToHistory() {
     if (mounted) {
       setState(() {
         _currentIndex = 1;
@@ -114,7 +113,7 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
   void _goToReviewWrite() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReviewWriteScreen(onDone: _goToReviews),
+        builder: (_) => ReviewWriteScreen(onDone: _goToHistory),
       ),
     );
   }
@@ -130,7 +129,6 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
                 index: _currentIndex,
                 children: [
                   HomeScreen(onCallPressed: _onCallPressed),
-                  const ReviewsScreen(),
                   const HistoryScreen(),
                   const CommunityMembersScreen(),
                   const SettingsScreen(),
@@ -173,11 +171,6 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: '홈',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.rate_review_outlined),
-              activeIcon: Icon(Icons.rate_review),
-              label: '리뷰',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.location_on_outlined),

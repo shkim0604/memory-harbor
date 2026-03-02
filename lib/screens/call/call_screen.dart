@@ -264,7 +264,7 @@ class _CallScreenState extends State<CallScreen> {
 
     final receiver = _viewModel.receiver;
     if (receiver == null) {
-      return const Center(child: Text('케어리시버 정보를 불러오는 중...'));
+      return const Center(child: Text('나레이터 정보를 불러오는 중...'));
     }
 
     return Column(

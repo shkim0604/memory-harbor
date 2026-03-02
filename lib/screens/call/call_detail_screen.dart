@@ -729,7 +729,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 케어기버 정보 & 날짜
+            // 인터뷰어 정보 & 날짜
             Row(
               children: [
                 Container(

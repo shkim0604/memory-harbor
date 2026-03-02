@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../constants/input_limits.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/onboarding_viewmodel.dart';
 
@@ -14,7 +15,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _nameController = TextEditingController();
   final _introController = TextEditingController();
   final OnboardingViewModel _viewModel = OnboardingViewModel();
-  static const int _introMaxLength = 50;
 
   @override
   void initState() {
@@ -240,14 +240,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         vertical: 16,
                       ),
                     ),
-                    maxLength: _introMaxLength,
+                    maxLength: InputLimits.introMessageMaxLength,
                     maxLines: 2,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return '한 마디를 입력해 주세요';
                       }
-                      if (value.trim().length > _introMaxLength) {
-                        return '한 마디는 $_introMaxLength자 이내로 입력해 주세요';
+                      if (value.trim().length >
+                          InputLimits.introMessageMaxLength) {
+                        return '한 마디는 ${InputLimits.introMessageMaxLength}자 이내로 입력해 주세요';
                       }
                       return null;
                     },
@@ -380,7 +381,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                         ),
                                       ),
                                       ChoiceChip(
-                                        label: const Text('Companion'),
+                                        label: const Text('Interviewer'),
                                         selected:
                                             role == 'companion' && selected,
                                         onSelected: selected

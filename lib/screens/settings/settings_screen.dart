@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import '../../constants/input_limits.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/settings_viewmodel.dart';
 
@@ -13,7 +14,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsViewModel _viewModel = SettingsViewModel();
-  static const int _introMaxLength = 50;
 
   @override
   void initState() {
@@ -136,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           controller: controller,
           decoration: const InputDecoration(hintText: '한 마디를 입력하세요'),
           maxLines: 2,
-          maxLength: _introMaxLength,
+          maxLength: InputLimits.introMessageMaxLength,
           autofocus: true,
         ),
         actions: [
@@ -154,10 +154,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final trimmed = result?.trim() ?? '';
     if (trimmed.isEmpty) return;
-    if (trimmed.length > _introMaxLength) {
+    if (trimmed.length > InputLimits.introMessageMaxLength) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('한 마디는 $_introMaxLength자 이내로 입력해 주세요')),
+          SnackBar(
+            content: Text(
+              '한 마디는 ${InputLimits.introMessageMaxLength}자 이내로 입력해 주세요',
+            ),
+          ),
         );
       }
       return;

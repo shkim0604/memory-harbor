@@ -40,6 +40,12 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     await _viewModel.loadMore();
     if (!mounted) return;
     setState(() {});
+    if (_viewModel.errorMessage == '그룹 정보를 찾을 수 없습니다') {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (!mounted) return;
+        _loadMore();
+      });
+    }
   }
 
   @override
@@ -52,6 +58,10 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       ),
       body: _viewModel.reviews.isEmpty && _viewModel.isLoading
           ? const Center(child: CircularProgressIndicator())
+          : _viewModel.reviews.isEmpty && _viewModel.errorMessage != null
+              ? _buildErrorState()
+              : _viewModel.reviews.isEmpty
+                  ? _buildEmptyState()
           : RefreshIndicator(
               onRefresh: () async {
                 await _viewModel.refresh();
@@ -73,6 +83,56 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 },
               ),
             ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            '아직 작성된 리뷰가 없습니다',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: () async {
+              await _viewModel.refresh();
+              if (mounted) setState(() {});
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: const Text('새로고침'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _viewModel.errorMessage ?? '리뷰를 불러올 수 없습니다',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: () async {
+              await _viewModel.refresh();
+              if (mounted) setState(() {});
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: const Text('다시 시도'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -9,7 +9,7 @@ import '../../utils/time_utils.dart';
 // Firebase 에서 불러오는 데이터
 // - 사용자 정보
 // - 그룹 정보 : User에 있는 groupIds를 기반으로 그룹 정보를 불러옴. 없으면 "그룹이 없습니다" 안내
-// - 케어리시버 정보 : 그룹 정보에 있는 receiverId를 기반으로 케어리시버 정보를 불러옴
+// - 나레이터 정보 : 그룹 정보에 있는 receiverId를 기반으로 나레이터 정보를 불러옴
 // - 통화기록 : 그룹 정보에 있는 groupId를 기반으로 통화기록을 불러옴
 
 class HomeScreen extends StatefulWidget {
@@ -27,9 +27,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _viewModel.init(onChanged: () {
-      if (mounted) setState(() {});
-    });
+    _viewModel.init(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
@@ -49,9 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: _buildBody(context),
-      ),
+      body: SafeArea(child: _buildBody(context)),
     );
   }
 
@@ -76,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ]);
       case HomeStatus.loadingReceiver:
         return _buildScaffoldWithSlivers([
-          _buildMessageSliver('케어리시버 정보를 불러오는 중...'),
+          _buildMessageSliver('나레이터 정보를 불러오는 중...'),
         ]);
       case HomeStatus.ready:
         final group = _viewModel.group;
@@ -96,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   receiver,
                   _viewModel.totalCompletedCalls,
                   _viewModel.thisWeekCalls,
-                  group.careGiverUserIds.length,
+                  group.careGiverUserIds.length + 1, // 나레이터 포함
                 ),
                 const SizedBox(height: 24),
                 _buildSectionHeader(
@@ -253,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
-  // 케어리시버 정보 섹션
+  // 나레이터 정보 섹션
   // ============================================================
   Widget _buildCareReceiverSection(
     CareReceiver receiver,
@@ -446,8 +446,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMyCallCard(Call call) {
     final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
     final icon = isCompleted ? Icons.call : Icons.phone_missed;
-    final name =
-        call.receiverNameSnapshot.isNotEmpty ? call.receiverNameSnapshot : '통화 상대';
+    final name = call.receiverNameSnapshot.isNotEmpty
+        ? call.receiverNameSnapshot
+        : '통화 상대';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -498,10 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Text(
             _formatDurationFromCall(call),
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -565,8 +563,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             height: 22,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: AppColors.primaryLight
-                                  .withValues(alpha: 0.35),
+                              color: AppColors.primaryLight.withValues(
+                                alpha: 0.35,
+                              ),
                             ),
                             child: Icon(
                               icon,
@@ -680,7 +679,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
 }
 
 class _CallHistoryListScreen extends StatelessWidget {
