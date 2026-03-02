@@ -257,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // 나레이터 정보 섹션
   // ============================================================
   Widget _buildCareReceiverSection(
-    CareReceiver receiver,
+    AppUser receiver,
     int totalCalls,
     int thisWeekCalls,
     int connectedPeople,

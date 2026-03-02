@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 import '../services/call_service.dart';
-import '../services/care_receiver_service.dart';
 import '../services/group_service.dart';
 import '../services/user_service.dart';
 import '../utils/time_utils.dart';
@@ -22,12 +21,12 @@ class HomeViewModel {
   User? firebaseUser;
   AppUser? user;
   Group? group;
-  CareReceiver? receiver;
+  AppUser? receiver;
   List<Call> calls = const [];
 
   StreamSubscription<AppUser?>? _userSub;
   StreamSubscription<Group?>? _groupSub;
-  StreamSubscription<CareReceiver?>? _receiverSub;
+  StreamSubscription<AppUser?>? _receiverSub;
   StreamSubscription<List<Call>>? _callsSub;
 
   void init({required void Function() onChanged}) {
@@ -91,9 +90,9 @@ class HomeViewModel {
     status = HomeStatus.loadingReceiver;
     onChanged();
 
-    _receiverSub = CareReceiverService.instance
-        .streamReceiver(receiverId)
-        .listen((nextReceiver) {
+    _receiverSub = UserService.instance.streamUser(receiverId).listen((
+      nextReceiver,
+    ) {
       receiver = nextReceiver;
       if (nextReceiver == null) {
         status = HomeStatus.loadingReceiver;
