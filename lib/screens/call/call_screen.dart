@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/models.dart';
 import '../../config/call_config.dart';
 import '../../theme/app_colors.dart';
@@ -44,6 +45,7 @@ class _CallScreenState extends State<CallScreen> {
   bool _reviewPromptShowing = false;
   String? _activeCallId;
   bool _callActionLocked = false;
+  String _latestMemo = '';
 
   @override
   void initState() {
@@ -184,43 +186,43 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _handleCallEndedFromOnCall() async {
     if (_reviewPromptShowing || !mounted) return;
     final durationSeconds = _session.callDurationSeconds;
-    if (durationSeconds < CallConfig.normalCallMinSeconds) {
-      final navigator = Navigator.of(context);
-      navigator.popUntil((route) => route.isFirst);
-      return;
-    }
-    _reviewPromptShowing = true;
     final navigator = Navigator.of(context);
+    bool shouldShowReview = durationSeconds >= CallConfig.normalCallMinSeconds;
 
-    final isNormal = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('통화 종료'),
-          content: const Text('정상적으로 통화가 종료되었나요?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('아니요'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('네'),
-            ),
-          ],
-        );
-      },
-    );
+    if (!shouldShowReview) {
+      _reviewPromptShowing = true;
+      final isNormal = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('통화 종료'),
+            content: const Text('정상적으로 통화가 종료되었나요?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('아니요'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('네'),
+              ),
+            ],
+          );
+        },
+      );
+      shouldShowReview = isNormal == true;
+    }
 
     if (!mounted) return;
     _reviewPromptShowing = false;
 
-    if (isNormal == true) {
+    if (shouldShowReview) {
       navigator.popUntil((route) => route.isFirst);
       navigator.push(
         MaterialPageRoute(
           builder: (_) => ReviewWriteScreen(
+            callId: _session.currentCallId ?? _activeCallId ?? widget.callId,
             onDone: () {
               Navigator.of(context).popUntil((route) => route.isFirst);
             },
@@ -680,8 +682,42 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
-  void _showMemoBottomSheet() {
-    showMemoBottomSheet(context);
+  Future<void> _showMemoBottomSheet() async {
+    final callId = _session.currentCallId ?? _activeCallId ?? widget.callId;
+    if (callId == null || callId.isEmpty) {
+      _showErrorSnackBar('통화 정보를 찾을 수 없어 메모를 저장할 수 없습니다');
+      return;
+    }
+
+    if (_latestMemo.isEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('calls')
+            .doc(callId)
+            .get();
+        final data = doc.data();
+        _latestMemo = (data?['humanNotes'] ?? '').toString();
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    final memo = await showMemoBottomSheet(context, initialText: _latestMemo);
+    if (memo == null) return;
+
+    final nextMemo = memo.trim();
+    _latestMemo = nextMemo;
+    try {
+      await FirebaseFirestore.instance.collection('calls').doc(callId).update({
+        'humanNotes': nextMemo,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('메모가 저장되었습니다')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showErrorSnackBar('메모 저장에 실패했습니다');
+    }
   }
 
   Color _getStatusColor() {

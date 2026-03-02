@@ -4,8 +4,11 @@ import '../theme/app_colors.dart';
 /// Shows a modal bottom sheet for writing a call memo.
 ///
 /// Returns the memo text if the user taps "저장", or `null` if dismissed.
-Future<String?> showMemoBottomSheet(BuildContext context) {
-  final memoController = TextEditingController();
+Future<String?> showMemoBottomSheet(
+  BuildContext context, {
+  String initialText = '',
+}) {
+  final memoController = TextEditingController(text: initialText);
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,

@@ -113,7 +113,10 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
   void _goToReviewWrite() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ReviewWriteScreen(onDone: _goToHistory),
+        builder: (_) => ReviewWriteScreen(
+          callId: _session.currentCallId,
+          onDone: _goToHistory,
+        ),
       ),
     );
   }

@@ -369,21 +369,6 @@ class CallSessionViewModel {
     _notifyChanged();
   }
 
-  Future<void> toggleRecording() async {
-    if (status != CallSessionState.onCall) {
-      _notifyError('통화 연결 후에 녹음을 사용할 수 있습니다');
-      return;
-    }
-    if (isRecording) {
-      await _stopServerRecording();
-      isRecording = false;
-    } else {
-      final started = await _startServerRecording();
-      isRecording = started;
-    }
-    _notifyChanged();
-  }
-
   /// Watch Firestore `calls/{callId}` for server-side status changes.
   /// If the call is marked missed/declined/cancelled while we're still
   /// connecting, automatically end the call and set [remotelyCancelled].
