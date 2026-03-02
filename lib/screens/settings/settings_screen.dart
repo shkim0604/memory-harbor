@@ -74,58 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _showEditEmailDialog() async {
-    final user = _viewModel.user;
-    if (user == null) return;
-
-    final controller = TextEditingController(text: user.email);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('이메일 변경'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: '새 이메일을 입력하세요'),
-          keyboardType: TextInputType.emailAddress,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('저장'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty && result != user.email) {
-      if (!_viewModel.isValidEmail(result)) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('이메일 형식을 확인해주세요')));
-        }
-        return;
-      }
-
-      final error = await _viewModel.updateEmail(result);
-      if (!mounted) return;
-      if (error != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error)));
-        return;
-      }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('이메일이 변경되었습니다')));
-    }
-  }
-
   Future<void> _showEditIntroDialog() async {
     final user = _viewModel.user;
     if (user == null) return;
@@ -519,17 +467,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: '한 마디 변경',
             onTap: _showEditIntroDialog,
           ),
-          _buildSettingItem(
-            icon: Icons.phone_outlined,
-            title: '연락처 관리',
-            onTap: _showEditEmailDialog,
-          ),
-          _buildSettingItem(
-            icon: Icons.location_on_outlined,
-            title: '거주지 정보',
-            subtitle: '시대별 거주지 입력',
-            onTap: () {},
-          ),
           const Divider(height: 1),
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -541,11 +478,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: AppColors.textSecondary,
               ),
             ),
-          ),
-          _buildSettingItem(
-            icon: Icons.notifications_outlined,
-            title: '알림 설정',
-            onTap: () {},
           ),
           _buildSettingItem(
             icon: Icons.lock_outline,
@@ -565,11 +497,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: _permissionStatusLabel(_viewModel.microphoneStatus),
             subtitleColor: _permissionStatusColor(_viewModel.microphoneStatus),
             onTap: () => _requestPermission(Permission.microphone, '마이크'),
-          ),
-          _buildSettingItem(
-            icon: Icons.help_outline,
-            title: '도움말',
-            onTap: () {},
           ),
         ],
       ),
