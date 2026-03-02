@@ -56,6 +56,12 @@ import flutter_callkit_incoming
     let map = payload.dictionaryPayload
     let appState = UIApplication.shared.applicationState
     NSLog("[PK] didReceiveIncomingPushWith: state=%@, payload=%@", String(describing: appState), "\(map)")
+    if appState == .active {
+      // Foreground path is handled by Flutter incoming-call stream.
+      NSLog("[PK] skip native CallKit presentation in active state")
+      completion()
+      return
+    }
     var completionCalled = false
     let finish: () -> Void = {
       if completionCalled { return }

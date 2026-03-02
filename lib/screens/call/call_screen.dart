@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/models.dart';
 import '../../config/call_config.dart';
 import '../../theme/app_colors.dart';
@@ -45,7 +44,6 @@ class _CallScreenState extends State<CallScreen> {
   bool _reviewPromptShowing = false;
   String? _activeCallId;
   bool _callActionLocked = false;
-  String _latestMemo = '';
 
   @override
   void initState() {
@@ -688,36 +686,18 @@ class _CallScreenState extends State<CallScreen> {
       _showErrorSnackBar('통화 정보를 찾을 수 없어 메모를 저장할 수 없습니다');
       return;
     }
-
-    if (_latestMemo.isEmpty) {
-      try {
-        final doc = await FirebaseFirestore.instance
-            .collection('calls')
-            .doc(callId)
-            .get();
-        final data = doc.data();
-        _latestMemo = (data?['humanNotes'] ?? '').toString();
-      } catch (_) {}
-    }
+    await _session.ensureMemoDraftLoaded(callId: callId);
 
     if (!mounted) return;
-    final memo = await showMemoBottomSheet(context, initialText: _latestMemo);
-    if (memo == null) return;
-
-    final nextMemo = memo.trim();
-    _latestMemo = nextMemo;
-    try {
-      await FirebaseFirestore.instance.collection('calls').doc(callId).update({
-        'humanNotes': nextMemo,
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('메모가 저장되었습니다')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      _showErrorSnackBar('메모 저장에 실패했습니다');
-    }
+    final memo = await showMemoBottomSheet(
+      context,
+      initialText: _session.memoDraft,
+    );
+    _session.updateMemoDraft(memo);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('메모가 임시 저장되었습니다')));
   }
 
   Color _getStatusColor() {

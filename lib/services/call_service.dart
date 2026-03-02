@@ -46,4 +46,9 @@ class CallService {
     final doc = await _callsCollection.doc(callId).get();
     return doc.data();
   }
+
+  Future<void> updateHumanNotes(String callId, String humanNotes) async {
+    if (callId.isEmpty) return;
+    await _callsCollection.doc(callId).update({'humanNotes': humanNotes});
+  }
 }

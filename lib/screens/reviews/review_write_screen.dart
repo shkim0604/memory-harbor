@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme/app_colors.dart';
+import '../../services/local_call_memo_service.dart';
 
 class ReviewWriteScreen extends StatefulWidget {
   final VoidCallback? onDone;
@@ -55,12 +56,13 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
   List<_TopicOption> _topicOptions = const [];
   String? _selectedTopicResidenceId;
   static const List<String> _emotionSourceOptions = ['내 것', '상대 것', '감정섞임'];
-  late final DateTime _screenOpenedAt;
+  final DateTime _requiredStepOpenedAt = DateTime.now();
+  int? _requiredDurationSec;
+  bool _isOptionalStep = false;
 
   @override
   void initState() {
     super.initState();
-    _screenOpenedAt = DateTime.now();
     _initReviewData();
   }
 
@@ -102,9 +104,13 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
           .doc(callId)
           .get();
       final callData = callDoc.data();
+      final localMemo = await LocalCallMemoService.instance.getMemo(callId);
+      if (localMemo != null) {
+        _callMemoController.text = localMemo;
+      } else {
+        _callMemoController.text = (callData?['humanNotes'] ?? '').toString();
+      }
       if (callData == null) return;
-
-      _callMemoController.text = (callData['humanNotes'] ?? '').toString();
 
       final mentioned = callData['mentionedResidences'];
       if (mentioned is List && mentioned.isNotEmpty && mentioned.first is Map) {
@@ -222,6 +228,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
       return;
     }
 
+    if (!_validateRequiredFields()) return;
     final notFullyHeardMoment = _notHeardMomentController.text.trim();
     final nextSessionTry = _nextTryController.text.trim();
     final emotionWord = _emotionWordController.text.trim();
@@ -229,44 +236,6 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     final callMemo = _callMemoController.text.trim();
     final selectedTopicResidenceId = _selectedTopicResidenceId?.trim();
     final listeningScore = _listeningScore;
-
-    if (selectedTopicResidenceId == null || selectedTopicResidenceId.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('1. 대화주제를 선택해주세요')));
-      return;
-    }
-    if (listeningScore == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('2. 경청 점수를 선택해주세요')));
-      return;
-    }
-
-    if (notFullyHeardMoment.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('② 내가 충분히 듣지 못했다고 느낀 순간을 입력해주세요')),
-      );
-      return;
-    }
-    if (nextSessionTry.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('③ 다음 세션에서 시도할 한 가지를 입력해주세요')),
-      );
-      return;
-    }
-    if (emotionWord.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('④ 감정을 표현하는 한 단어를 입력해주세요')));
-      return;
-    }
-    if (emotionSource.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('④ 감정의 출처를 선택해주세요')));
-      return;
-    }
 
     setState(() {
       _isSubmitting = true;
@@ -290,8 +259,10 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
       final firestore = FirebaseFirestore.instance;
       final callRef = firestore.collection('calls').doc(callId);
       final batch = firestore.batch();
-      final writeDurationSec = DateTime.now()
-          .difference(_screenOpenedAt)
+      final requiredDurationSec =
+          _requiredDurationSec ??
+          DateTime.now()
+              .difference(_requiredStepOpenedAt)
           .inSeconds
           .clamp(0, 86400);
 
@@ -311,6 +282,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         'emotionWord': emotionWord,
         'emotionSource': emotionSource,
         'smallReset': _smallResetController.text.trim(),
+        'requiredQuestionDurationSec': requiredDurationSec,
       };
 
       if (_existingMyReviewDocId != null) {
@@ -319,16 +291,17 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
             .doc(_existingMyReviewDocId);
         batch.update(reviewRef, <String, dynamic>{
           ...payload,
-          'lastWriteDurationSec': writeDurationSec,
-          'lastWriteStartedAtClient': Timestamp.fromDate(_screenOpenedAt),
+          'lastWriteDurationSec': requiredDurationSec,
+          'lastWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
           'lastWriteType': 'edit',
           'updatedAt': FieldValue.serverTimestamp(),
         });
         final logRef = reviewRef.collection('write_logs').doc();
         batch.set(logRef, <String, dynamic>{
           'type': 'edit',
-          'durationSec': writeDurationSec,
-          'startedAtClient': Timestamp.fromDate(_screenOpenedAt),
+          'durationSec': requiredDurationSec,
+          'startedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+          'phase': 'required',
           'savedAt': FieldValue.serverTimestamp(),
         });
         batch.update(callRef, <String, dynamic>{
@@ -339,18 +312,19 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         final reviewRef = callRef.collection('reviews').doc();
         batch.set(reviewRef, <String, dynamic>{
           ...payload,
-          'firstWriteDurationSec': writeDurationSec,
-          'firstWriteStartedAtClient': Timestamp.fromDate(_screenOpenedAt),
-          'lastWriteDurationSec': writeDurationSec,
-          'lastWriteStartedAtClient': Timestamp.fromDate(_screenOpenedAt),
+          'firstWriteDurationSec': requiredDurationSec,
+          'firstWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+          'lastWriteDurationSec': requiredDurationSec,
+          'lastWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
           'lastWriteType': 'create',
           'createdAt': FieldValue.serverTimestamp(),
         });
         final logRef = reviewRef.collection('write_logs').doc();
         batch.set(logRef, <String, dynamic>{
           'type': 'create',
-          'durationSec': writeDurationSec,
-          'startedAtClient': Timestamp.fromDate(_screenOpenedAt),
+          'durationSec': requiredDurationSec,
+          'startedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+          'phase': 'required',
           'savedAt': FieldValue.serverTimestamp(),
         });
         batch.update(callRef, <String, dynamic>{
@@ -362,6 +336,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
       }
 
       await batch.commit();
+      await LocalCallMemoService.instance.removeMemo(callId);
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -383,6 +358,64 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     }
   }
 
+  bool _validateRequiredFields() {
+    final notFullyHeardMoment = _notHeardMomentController.text.trim();
+    final nextSessionTry = _nextTryController.text.trim();
+    final emotionWord = _emotionWordController.text.trim();
+    final emotionSource = _emotionSource.trim();
+    final selectedTopicResidenceId = _selectedTopicResidenceId?.trim();
+    final listeningScore = _listeningScore;
+
+    if (selectedTopicResidenceId == null || selectedTopicResidenceId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('1. 대화주제를 선택해주세요')));
+      return false;
+    }
+    if (listeningScore == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('2. 경청 점수를 선택해주세요')));
+      return false;
+    }
+    if (notFullyHeardMoment.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('3. 충분히 듣지 못한 순간을 입력해주세요')),
+      );
+      return false;
+    }
+    if (nextSessionTry.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('4. 다음 세션에서 시도할 한 가지를 입력해주세요')),
+      );
+      return false;
+    }
+    if (emotionWord.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('5. 감정을 표현하는 한 단어를 입력해주세요')));
+      return false;
+    }
+    if (emotionSource.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('5-1. 감정의 출처를 선택해주세요')));
+      return false;
+    }
+    return true;
+  }
+
+  void _goToOptionalStep() {
+    if (!_validateRequiredFields()) return;
+    setState(() {
+      _requiredDurationSec = DateTime.now()
+          .difference(_requiredStepOpenedAt)
+          .inSeconds
+          .clamp(0, 86400);
+      _isOptionalStep = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -393,77 +426,127 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          _buildSectionTitle('1. 대화주제: 시대별 거주지'),
-          const SizedBox(height: 8),
-          _buildTopicDropdown(),
-          const SizedBox(height: 20),
-          _buildSectionTitle('2. 오늘 나의 경청은 몇 점? (1~10)'),
-          const SizedBox(height: 8),
-          Text(
-            '1점: 주어진 태스크를 수행하기에 급급했다\n10점: 상대의 속도에 맞추어 충분히 이해하며 들었다 (경청자 역할)',
-            style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 10),
-          _buildScoreDropdown(),
-          const SizedBox(height: 22),
-          _buildSectionTitle('3. 내가 충분히 듣지 못했다고 느낀 순간이 있었나? 무엇이 그렇게 만들었나?'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _notHeardMomentController,
-            hint: '그 순간과 이유를 적어주세요',
-            maxLines: 4,
-          ),
-          const SizedBox(height: 22),
-          _buildSectionTitle('4. 다음 세션에서 하나만 바꾼다면, 무엇을 시도해볼 것인가?'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _nextTryController,
-            hint: '다음에 시도할 한 가지를 적어주세요',
-            maxLines: 3,
-          ),
-          const SizedBox(height: 22),
-          _buildSectionTitle('5. 내 감정을 표현하는 한 단어는?'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _emotionWordController,
-            hint: '예: 아쉬움, 안도, 뿌듯함',
-            maxLines: 1,
-          ),
-          const SizedBox(height: 22),
-          _buildSubQuestionBlock(
-            title: '5-1. 그 감정은 어디에 가까운가?',
-            child: _buildEmotionSourceDropdown(),
-          ),
-          const SizedBox(height: 22),
-          _buildSubQuestionBlock(
-            title: '5-2. (선택) 이 감정을 오래 끌고 가지 않기 위해, 내가 할 작은 행동 1개는?',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildOptionalLabel(),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _smallResetController,
-                  hint: '예: 5분 산책, 물 한 잔 마시기',
-                  maxLines: 2,
-                ),
-              ],
+        children: _isOptionalStep
+            ? _buildOptionalStepChildren()
+            : _buildRequiredStepChildren(),
+      ),
+    );
+  }
+
+  List<Widget> _buildRequiredStepChildren() {
+    return [
+      _buildStepHeader('1/2 단계 · 필수 질문'),
+      const SizedBox(height: 16),
+      _buildSectionTitle('1. 대화주제: 시대별 거주지'),
+      const SizedBox(height: 8),
+      _buildTopicDropdown(),
+      const SizedBox(height: 20),
+      _buildSectionTitle('2. 오늘 나의 경청은 몇 점? (1~10)'),
+      const SizedBox(height: 8),
+      Text(
+        '1점: 주어진 태스크를 수행하기에 급급했다\n10점: 상대의 속도에 맞추어 충분히 이해하며 들었다 (경청자 역할)',
+        style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
+      ),
+      const SizedBox(height: 10),
+      _buildScoreDropdown(),
+      const SizedBox(height: 22),
+      _buildSectionTitle('3. 내가 충분히 듣지 못했다고 느낀 순간이 있었나? 무엇이 그렇게 만들었나?'),
+      const SizedBox(height: 8),
+      _buildTextField(
+        controller: _notHeardMomentController,
+        hint: '그 순간과 이유를 적어주세요',
+        maxLines: 4,
+      ),
+      const SizedBox(height: 22),
+      _buildSectionTitle('4. 다음 세션에서 하나만 바꾼다면, 무엇을 시도해볼 것인가?'),
+      const SizedBox(height: 8),
+      _buildTextField(
+        controller: _nextTryController,
+        hint: '다음에 시도할 한 가지를 적어주세요',
+        maxLines: 3,
+      ),
+      const SizedBox(height: 22),
+      _buildSectionTitle('5. 내 감정을 표현하는 한 단어는?'),
+      const SizedBox(height: 8),
+      _buildTextField(
+        controller: _emotionWordController,
+        hint: '예: 아쉬움, 안도, 뿌듯함',
+        maxLines: 1,
+      ),
+      const SizedBox(height: 22),
+      _buildSubQuestionBlock(
+        title: '5-1. 그 감정은 어디에 가까운가?',
+        child: _buildEmotionSourceDropdown(),
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: (_isSubmitting || _isLoadingExisting)
+              ? null
+              : _goToOptionalStep,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          const SizedBox(height: 22),
-          _buildSectionTitle('6. (선택) 통화 메모'),
-          const SizedBox(height: 8),
-          _buildOptionalLabel(description: '통화 요약이나 주요 대화 내용을 메모해 주세요.'),
-          const SizedBox(height: 8),
-          _buildTextField(
-            controller: _callMemoController,
-            hint: '메모를 입력하세요',
-            maxLines: 4,
+          child: Text(
+            _isLoadingExisting ? '불러오는 중...' : '선택 질문으로 이동',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildOptionalStepChildren() {
+    return [
+      _buildStepHeader('2/2 단계 · 선택 질문'),
+      const SizedBox(height: 16),
+      _buildSubQuestionBlock(
+        title: '5-2. (선택) 이 감정을 오래 끌고 가지 않기 위해, 내가 할 작은 행동 1개는?',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildOptionalLabel(),
+            const SizedBox(height: 8),
+            _buildTextField(
+              controller: _smallResetController,
+              hint: '예: 5분 산책, 물 한 잔 마시기',
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 22),
+      _buildSectionTitle('6. (선택) 통화 메모'),
+      const SizedBox(height: 8),
+      _buildOptionalLabel(description: '통화 요약이나 주요 대화 내용을 메모해 주세요.'),
+      const SizedBox(height: 8),
+      _buildTextField(
+        controller: _callMemoController,
+        hint: '메모를 입력하세요',
+        maxLines: 4,
+      ),
+      const SizedBox(height: 24),
+      Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: (_isSubmitting || _isLoadingExisting)
+                  ? null
+                  : () {
+                      setState(() {
+                        _isOptionalStep = false;
+                      });
+                    },
+              child: const Text('필수로 돌아가기'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: ElevatedButton(
               onPressed: (_isSubmitting || _isLoadingExisting) ? null : _submit,
               style: ElevatedButton.styleFrom(
@@ -474,9 +557,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
                 ),
               ),
               child: Text(
-                _isLoadingExisting
-                    ? '불러오는 중...'
-                    : (_isSubmitting ? '저장 중...' : '저장'),
+                _isSubmitting ? '저장 중...' : '저장',
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
@@ -485,6 +566,24 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
             ),
           ),
         ],
+      ),
+    ];
+  }
+
+  Widget _buildStepHeader(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }

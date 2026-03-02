@@ -3,12 +3,18 @@ import '../theme/app_colors.dart';
 
 /// Shows a modal bottom sheet for writing a call memo.
 ///
-/// Returns the memo text if the user taps "저장", or `null` if dismissed.
-Future<String?> showMemoBottomSheet(
+/// Always returns the latest memo text when the sheet is dismissed
+/// (close button, outside tap, drag down).
+Future<String> showMemoBottomSheet(
   BuildContext context, {
   String initialText = '',
 }) {
+  var latestText = initialText;
   final memoController = TextEditingController(text: initialText);
+  memoController.addListener(() {
+    latestText = memoController.text;
+  });
+
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -40,7 +46,7 @@ Future<String?> showMemoBottomSheet(
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(context, memoController.text),
                 ),
               ],
             ),
@@ -61,26 +67,16 @@ Future<String?> showMemoBottomSheet(
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context, memoController.text),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  '저장',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
+            Text(
+              '닫으면 임시 저장됩니다',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textHint,
               ),
             ),
           ],
         ),
       ),
     ),
-  );
+  ).then((value) => value ?? latestText);
 }

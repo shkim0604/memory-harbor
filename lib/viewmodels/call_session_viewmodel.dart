@@ -11,6 +11,7 @@ import '../services/agora_service.dart';
 import '../services/call_service.dart';
 import '../services/permission_service.dart';
 import '../services/call_invite_service.dart';
+import '../services/local_call_memo_service.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import '../services/call_notification_service.dart' show CallInvitePayload;
 import '../widgets/call_status_indicator.dart';
@@ -36,6 +37,9 @@ class CallSessionViewModel {
   String? currentCallerId;
   String? currentReceiverId;
   String? currentToken;
+  String _memoDraft = '';
+  bool _memoDirty = false;
+  String? _memoLoadedCallId;
 
   Timer? _callTimer;
   bool _isEnding = false;
@@ -85,6 +89,8 @@ class CallSessionViewModel {
     final seconds = (callDurationSeconds % 60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
+
+  String get memoDraft => _memoDraft;
 
   Future<bool> startCall(
     BuildContext context, {
@@ -194,10 +200,16 @@ class CallSessionViewModel {
     final nextUid = uid ?? AgoraConfig.defaultUid;
     currentChannelName = nextChannelName;
     currentGroupId = groupId;
+    if (currentCallId != callId) {
+      _memoDraft = '';
+      _memoDirty = false;
+      _memoLoadedCallId = null;
+    }
     currentCallId = callId;
     currentUid = nextUid;
     currentCallerId = callerUserId;
     currentReceiverId = peerUserId;
+    unawaited(ensureMemoDraftLoaded(callId: callId));
     String nextToken = token ?? '';
 
     if (nextToken.isEmpty && AgoraConfig.apiBaseUrl.isNotEmpty) {
@@ -358,15 +370,61 @@ class CallSessionViewModel {
   Future<void> endCall() => _doEndCall(notifyServer: true);
 
   Future<void> toggleMute() async {
+    if (status != CallSessionState.onCall) return;
     isMuted = !isMuted;
     await AgoraService.instance.setMuted(isMuted);
     _notifyChanged();
   }
 
   Future<void> toggleSpeaker() async {
+    if (status != CallSessionState.onCall) return;
     isSpeaker = !isSpeaker;
     await AgoraService.instance.setSpeakerOn(isSpeaker);
     _notifyChanged();
+  }
+
+  Future<void> ensureMemoDraftLoaded({String? callId}) async {
+    final targetCallId = (callId ?? currentCallId ?? '').trim();
+    if (targetCallId.isEmpty) return;
+    if (_memoLoadedCallId == targetCallId) return;
+    final localMemo = await LocalCallMemoService.instance.getMemo(targetCallId);
+    if (localMemo != null) {
+      _memoDraft = localMemo;
+      // Prefer local cache while call is active; flush on end.
+      _memoDirty = true;
+      _memoLoadedCallId = targetCallId;
+      _notifyChanged();
+      return;
+    }
+    try {
+      final data = await CallService.instance.getCallDoc(targetCallId);
+      _memoDraft = (data?['humanNotes'] ?? '').toString();
+      _memoDirty = false;
+      _memoLoadedCallId = targetCallId;
+      _notifyChanged();
+    } catch (_) {
+      // Best-effort load. Keep local draft empty on failures.
+    }
+  }
+
+  void updateMemoDraft(String text) {
+    final nextText = text;
+    if (_memoDraft == nextText) return;
+    _memoDraft = nextText;
+    _memoDirty = true;
+    final targetCallId = (currentCallId ?? '').trim();
+    if (targetCallId.isNotEmpty) {
+      unawaited(LocalCallMemoService.instance.setMemo(targetCallId, nextText));
+    }
+    _notifyChanged();
+  }
+
+  Future<void> persistMemoDraftIfNeeded({String? callId}) async {
+    final targetCallId = (callId ?? currentCallId ?? '').trim();
+    if (targetCallId.isEmpty || !_memoDirty) return;
+    await CallService.instance.updateHumanNotes(targetCallId, _memoDraft.trim());
+    _memoDirty = false;
+    _memoLoadedCallId = targetCallId;
   }
 
   /// Watch Firestore `calls/{callId}` for server-side status changes.
@@ -550,6 +608,10 @@ class CallSessionViewModel {
     _stopWatchingCallStatus();
     final previousStatus = status;
     final callIdToEnd = currentCallId;
+    final shouldPersistMemo =
+        notifyServer &&
+        previousStatus == CallSessionState.onCall &&
+        !_remotelyCancelled;
     debugPrint(
       '$_tag endCall begin: callId=$callIdToEnd previous=$previousStatus notifyServer=$notifyServer',
     );
@@ -559,8 +621,7 @@ class CallSessionViewModel {
     if (notifyServer && callIdToEnd != null && callIdToEnd.isNotEmpty) {
       if (previousStatus == CallSessionState.onCall) {
         debugPrint('$_tag endCall notify: end callId=$callIdToEnd');
-        serverNotify =
-            CallInviteService.instance.endCall(callId: callIdToEnd);
+        serverNotify = CallInviteService.instance.endCall(callId: callIdToEnd);
       } else if (previousStatus == CallSessionState.connecting) {
         debugPrint('$_tag endCall notify: cancel callId=$callIdToEnd');
         serverNotify =
@@ -568,49 +629,70 @@ class CallSessionViewModel {
       }
     }
 
-    // 2. Stop recording & leave Agora channel.
-    if (isRecording && _isLocalCaller) {
-      if (notifyServer) {
-        unawaited(_stopServerRecording());
-      } else {
-        await _stopServerRecording();
-      }
-    }
-    await AgoraService.instance.leaveChannel();
-
-    // 3. Update local state & notify UI.
-    _resetCallState();
-
-    // 4. Dismiss iOS CallKit / Android notification UI.
     try {
-      if (callIdToEnd != null && callIdToEnd.isNotEmpty) {
-        await FlutterCallkitIncoming.endCall(callIdToEnd);
-      } else {
-        await FlutterCallkitIncoming.endAllCalls();
-      }
-    } catch (_) {
-      // Ignore if CallKit is not active or unavailable.
-    }
-
-    // 5. Ensure server notification completes.
-    if (serverNotify != null) {
       try {
-        await serverNotify;
-        debugPrint('$_tag endCall notify: completed callId=$callIdToEnd');
-      } catch (_) {}
+        if (shouldPersistMemo) {
+          await persistMemoDraftIfNeeded(callId: callIdToEnd);
+        } else if (callIdToEnd != null && callIdToEnd.isNotEmpty) {
+          await LocalCallMemoService.instance.removeMemo(callIdToEnd);
+        }
+      } catch (e) {
+        if (shouldPersistMemo) {
+          _notifyError('메모 자동 저장에 실패했습니다');
+        }
+        debugPrint('$_tag memo handling failed: $e');
+      }
+
+      // 2. Stop recording & leave Agora channel.
+      if (isRecording && _isLocalCaller) {
+        if (notifyServer) {
+          unawaited(_stopServerRecording());
+        } else {
+          await _stopServerRecording();
+        }
+      }
+      await AgoraService.instance.leaveChannel();
+    } catch (e) {
+      debugPrint('$_tag endCall cleanup error: $e');
+    } finally {
+      // 3. Always update local state & notify UI even if cleanup fails.
+      _resetCallState();
+
+      // 4. Dismiss iOS CallKit / Android notification UI.
+      try {
+        if (callIdToEnd != null && callIdToEnd.isNotEmpty) {
+          await FlutterCallkitIncoming.endCall(callIdToEnd);
+        } else {
+          await FlutterCallkitIncoming.endAllCalls();
+        }
+      } catch (_) {
+        // Ignore if CallKit is not active or unavailable.
+      }
+
+      // 5. Ensure server notification completes.
+      if (serverNotify != null) {
+        try {
+          await serverNotify;
+          debugPrint('$_tag endCall notify: completed callId=$callIdToEnd');
+        } catch (_) {}
+      }
+      debugPrint('$_tag endCall done: callId=$callIdToEnd');
+      _isEnding = false;
     }
-    debugPrint('$_tag endCall done: callId=$callIdToEnd');
-    _isEnding = false;
   }
 
   /// Reset local call state. Called from [_doEndCall] and from the
   /// [onLeaveChannel] callback when an unexpected disconnect occurs.
   void _resetCallState() {
     status = CallSessionState.ended;
+    isMuted = false;
     isRecording = false;
     remoteUsers.clear();
     _stopCallTimer();
     _syncConnectingTone();
+    _memoDraft = '';
+    _memoDirty = false;
+    _memoLoadedCallId = null;
     _notifyChanged();
   }
 
