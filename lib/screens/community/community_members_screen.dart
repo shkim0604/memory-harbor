@@ -12,15 +12,19 @@ class CommunityMembersScreen extends StatefulWidget {
 
 class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
   final CommunityMembersViewModel _viewModel = CommunityMembersViewModel();
-  final PageController _othersController = PageController(viewportFraction: 0.94);
+  final PageController _othersController = PageController(
+    viewportFraction: 0.88,
+  );
   static const String _defaultIntroMessage = '함께 이야기를 모아봐요';
 
   @override
   void initState() {
     super.initState();
-    _viewModel.init(onChanged: () {
-      if (mounted) setState(() {});
-    });
+    _viewModel.init(
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   @override
@@ -41,48 +45,21 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('공동체 구성원'),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          _buildBackgroundDecor(),
-          _buildBody(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackgroundDecor() {
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned(
-            top: -80,
-            right: -40,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.accent.withValues(alpha: 0.08),
-              ),
-            ),
+      appBar: AppBar(title: const Text('우리 그룹'), centerTitle: true),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.primaryLight.withValues(alpha: 0.14),
+              AppColors.background,
+              AppColors.background,
+            ],
+            stops: const [0.0, 0.22, 1.0],
           ),
-          Positioned(
-            bottom: -90,
-            left: -50,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.06),
-              ),
-            ),
-          ),
-        ],
+        ),
+        child: _buildBody(),
       ),
     );
   }
@@ -106,111 +83,98 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
     final receiver = _viewModel.receiver;
     final caregivers = _viewModel.caregivers;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      child: Column(
-        children: [
-          Expanded(
-            flex: 1,
-            child: _buildStaticSection(
-              title: 'Narrator',
-              icon: Icons.auto_stories_rounded,
-              child: receiver == null
-                  ? _buildEmptyCard('Narrator 정보를 불러오는 중입니다.')
-                  : _buildReceiverCard(receiver),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Expanded(
-            flex: 1,
-            child: _buildCarouselSection(
-              title: 'Interviewer ${caregivers.length}명',
-              icon: Icons.groups_2_outlined,
-              controller: _othersController,
-              items: caregivers.isEmpty
-                  ? [
-                      _buildEmptyCard('등록된 Interviewer가 없습니다.'),
-                    ]
-                  : caregivers.map(_buildCaregiverCard).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStaticSection({
-    required String title,
-    required IconData icon,
-    required Widget child,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.accentLight.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle(title, icon: icon),
-          const SizedBox(height: 10),
-          Expanded(child: child),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCarouselSection({
-    required String title,
-    required IconData icon,
-    required PageController controller,
-    required List<Widget> items,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.accentLight.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle(title, icon: icon),
-          const SizedBox(height: 10),
-          Expanded(
-            child: PageView.builder(
-              controller: controller,
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                return AnimatedBuilder(
-                  animation: controller,
-                  builder: (context, child) {
-                    double value = 1.0;
-                    if (controller.position.haveDimensions) {
-                      value = controller.page! - index;
-                      value = (1 - (value.abs() * 0.12)).clamp(0.88, 1.0);
-                    }
-                    return Transform.scale(
-                      scale: value,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: child,
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Text(
+                      '나레이터',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
-                    );
-                  },
-                  child: items[index],
-                );
-              },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: receiver == null
+                        ? _buildEmptyCard('나레이터 정보를 불러오는 중입니다.')
+                        : SizedBox.expand(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: FractionallySizedBox(
+                                widthFactor: _othersController.viewportFraction,
+                                heightFactor: 1,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: _buildReceiverCard(receiver),
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                  if (caregivers.length > 1) ...[
+                    const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
             ),
-          ),
-          if (items.length > 1) ...[
-            const SizedBox(height: 8),
-            _buildPageIndicator(controller, items.length),
+            const SizedBox(height: 12),
+            Expanded(
+              flex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      '인터뷰어 ${caregivers.length}명',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: caregivers.isEmpty
+                        ? _buildEmptyCard('등록된 구성원이 없습니다.')
+                        : PageView.builder(
+                            controller: _othersController,
+                            itemCount: caregivers.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: _buildCaregiverCard(caregivers[index]),
+                              );
+                            },
+                          ),
+                  ),
+                  if (caregivers.length > 1) ...[
+                    const SizedBox(height: 8),
+                    _buildPageIndicator(_othersController, caregivers.length),
+                  ],
+                ],
+              ),
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -235,7 +199,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
                 color: isActive
-                    ? AppColors.accent
+                    ? AppColors.primary
                     : AppColors.textHint.withValues(alpha: 0.3),
               ),
             );
@@ -245,40 +209,11 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title, {required IconData icon}) {
-    return Row(
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: AppColors.accentLight.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 18, color: AppColors.secondary),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildRoleChip(String subtitle) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.accentLight.withValues(alpha: 0.5),
+        color: AppColors.primaryLight.withValues(alpha: 0.26),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -298,7 +233,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
   Widget _buildReceiverCard(CareReceiver receiver) {
     return _buildMemberCard(
       name: receiver.name,
-      subtitle: 'Narrator',
+      subtitle: '',
       imageUrl: receiver.profileImage,
       introMessage: _defaultIntroMessage,
     );
@@ -307,7 +242,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
   Widget _buildCaregiverCard(AppUser user) {
     return _buildMemberCard(
       name: user.name,
-      subtitle: user.email.isNotEmpty ? user.email : 'Interviewer',
+      subtitle: '',
       imageUrl: user.profileImage,
       introMessage: user.introMessage.isNotEmpty
           ? user.introMessage
@@ -322,65 +257,58 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
     required String introMessage,
   }) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            AppColors.surfaceVariant.withValues(alpha: 0.55),
-          ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primaryLight.withValues(alpha: 0.45),
         ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.accentLight.withValues(alpha: 0.6)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.045),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final imageWidth = constraints.maxWidth / 3;
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    bottomLeft: Radius.circular(18),
-                  ),
-                  child: SizedBox(
-                    width: imageWidth,
-                    child: _buildRectProfile(
-                      imageUrl: imageUrl,
-                      fallbackText: name,
-                    ),
+          final imageWidth = constraints.maxWidth * 2 / 5;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+                child: SizedBox(
+                  width: imageWidth,
+                  child: _buildRectProfile(
+                    imageUrl: imageUrl,
+                    fallbackText: name,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 14, 14, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          name.isNotEmpty ? name : '이름 없음',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 14, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name.isNotEmpty ? name : '이름 없음',
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (subtitle.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         LayoutBuilder(
                           builder: (context, chipConstraints) {
@@ -392,49 +320,40 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 8),
-                        Container(
+                      ],
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.75),
+                            color: AppColors.surfaceVariant.withValues(
+                              alpha: 0.75,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.format_quote_rounded,
-                                size: 16,
-                                color: AppColors.textHint.withValues(alpha: 0.75),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  introMessage,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary.withValues(
-                                      alpha: 0.9,
-                                    ),
-                                    height: 1.35,
-                                  ),
+                          child: SingleChildScrollView(
+                            child: Text(
+                              introMessage,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary.withValues(
+                                  alpha: 0.9,
                                 ),
+                                height: 1.4,
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
@@ -446,30 +365,32 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
     required String fallbackText,
   }) {
     final hasImage = imageUrl.isNotEmpty;
+    final fallbackChar = fallbackText.isNotEmpty ? fallbackText[0] : '?';
     return Container(
-      decoration: BoxDecoration(
-        color: hasImage ? null : AppColors.accentLight,
-        image: hasImage
-            ? DecorationImage(
-                image: imageUrl.startsWith('assets/')
-                    ? AssetImage(imageUrl) as ImageProvider
-                    : NetworkImage(imageUrl),
-                fit: BoxFit.cover,
-              )
-            : null,
-      ),
+      decoration: BoxDecoration(color: AppColors.accentLight),
       child: hasImage
-          ? null
-          : Center(
-              child: Text(
-                fallbackText.isNotEmpty ? fallbackText[0] : '?',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+          ? (imageUrl.startsWith('assets/')
+                ? Image.asset(imageUrl, fit: BoxFit.cover)
+                : Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        _buildProfileFallback(fallbackChar),
+                  ))
+          : _buildProfileFallback(fallbackChar),
+    );
+  }
+
+  Widget _buildProfileFallback(String fallbackChar) {
+    return Center(
+      child: Text(
+        fallbackChar,
+        style: const TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
     );
   }
 

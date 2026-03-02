@@ -183,7 +183,7 @@ class _CaregiverMainNavigationState extends State<CaregiverMainNavigation> {
             BottomNavigationBarItem(
               icon: Icon(Icons.group_outlined),
               activeIcon: Icon(Icons.group),
-              label: '공동체',
+              label: '그룹',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),

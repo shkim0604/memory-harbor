@@ -29,6 +29,30 @@ class CallDetailScreen extends StatefulWidget {
 
 class _CallDetailScreenState extends State<CallDetailScreen>
     with TickerProviderStateMixin {
+  static const List<_SessionGuideStep> _sessionGuideSteps = [
+    _SessionGuideStep(
+      title: '[Step 1.] 🗝️ Memory (기억 열기)',
+      examples: [
+        '"1940년대에 함경북도 청진에서 사셨다고 들었는데, 그곳에서 가장 먼저 떠오르는 장면이 있으세요?"',
+      ],
+    ),
+    _SessionGuideStep(
+      title: '[Step 2.] 🔍 Moment (장면 몰입)',
+      examples: [
+        '"그 순간에 특히 또렷하게 떠오르는 부분이 있으세요?"',
+        '"그 순간의 감정, 소리, 냄새는 어땠나요?"',
+      ],
+    ),
+    _SessionGuideStep(
+      title: '[Step 3.] ✨ Meaning (의미 발견)',
+      examples: [
+        '"지금 돌아보니 그 일은 어떤 의미인가요?"',
+        '"가족들이 꼭 기억해줬으면 하는 점이 있다면 무엇일까요?"',
+      ],
+      isOptional: true,
+    ),
+  ];
+
   final CallDetailViewModel _viewModel = CallDetailViewModel();
   final CallSessionViewModel _session = CallSessionViewModel.instance;
   final PageController _carouselController = PageController(
@@ -253,9 +277,96 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       ),
       body: Column(
         children: [
+          _buildSessionGuideCard(),
           _buildKeywordsCard(_viewModel.keywords),
           Expanded(child: _buildPreviousCallsSection(_viewModel.previousCalls)),
           _buildCallStatusBar(),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // 세션 가이드
+  // ============================================================
+  Widget _buildSessionGuideCard() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Session Guide: 3M Question',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ..._sessionGuideSteps.map(_buildSessionGuideStep),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionGuideStep(_SessionGuideStep step) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  step.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (step.isOptional)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    '생략 가능',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...step.examples.map(
+            (example) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '예) $example',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -865,4 +976,16 @@ class _CallDetailScreenState extends State<CallDetailScreen>
     final et = TimeUtils.toEt(dateTime);
     return '${et.year}.${et.month.toString().padLeft(2, '0')}.${et.day.toString().padLeft(2, '0')}';
   }
+}
+
+class _SessionGuideStep {
+  final String title;
+  final List<String> examples;
+  final bool isOptional;
+
+  const _SessionGuideStep({
+    required this.title,
+    required this.examples,
+    this.isOptional = false,
+  });
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
-import '../services/care_receiver_service.dart';
 import '../services/group_service.dart';
 import '../services/user_service.dart';
 
@@ -107,16 +106,25 @@ class CommunityMembersViewModel {
     status = CommunityMembersStatus.loadingMembers;
     onChanged();
 
-    final receiverFuture =
-        CareReceiverService.instance.getReceiver(nextGroup.receiverId);
+    final receiverUserFuture = UserService.instance.getUser(nextGroup.receiverId);
     final caregiversFuture = Future.wait<AppUser?>(
       nextGroup.careGiverUserIds.map(UserService.instance.getUser),
     );
 
-    final nextReceiver = await receiverFuture;
+    final receiverUser = await receiverUserFuture;
     final nextCaregivers = await caregiversFuture;
 
     if (_disposed || token != _loadToken) return;
+
+    final nextReceiver = receiverUser == null
+        ? null
+        : CareReceiver(
+            receiverId: receiverUser.uid,
+            groupId: nextGroup.groupId,
+            name: receiverUser.name,
+            profileImage: receiverUser.profileImage,
+            majorResidences: const [],
+          );
 
     receiver = nextReceiver;
     final filtered = nextCaregivers.whereType<AppUser>().toList();

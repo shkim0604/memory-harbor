@@ -24,37 +24,49 @@ class ProfileAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
     final bgColor = backgroundColor ?? AppColors.accentLight;
+    final fallbackChar = fallbackText?.isNotEmpty == true ? fallbackText![0] : '?';
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: hasImage ? null : bgColor,
+        color: bgColor,
         border: borderWidth > 0 && borderColor != null
             ? Border.all(color: borderColor!, width: borderWidth)
             : null,
-        image: hasImage
-            ? DecorationImage(
-                image: imageUrl!.startsWith('assets/')
-                    ? AssetImage(imageUrl!) as ImageProvider
-                    : NetworkImage(imageUrl!),
-                fit: BoxFit.cover,
-              )
-            : null,
       ),
-      child: hasImage
-          ? null
-          : Center(
-              child: Text(
-                fallbackText?.isNotEmpty == true ? fallbackText![0] : '?',
-                style: TextStyle(
-                  fontSize: size * 0.4,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+      child: ClipOval(
+        child: hasImage
+            ? (imageUrl!.startsWith('assets/')
+                  ? Image.asset(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      width: size,
+                      height: size,
+                    )
+                  : Image.network(
+                      imageUrl!,
+                      fit: BoxFit.cover,
+                      width: size,
+                      height: size,
+                      errorBuilder: (_, _, _) => _buildFallback(fallbackChar),
+                    ))
+            : _buildFallback(fallbackChar),
+      ),
+    );
+  }
+
+  Widget _buildFallback(String fallbackChar) {
+    return Center(
+      child: Text(
+        fallbackChar,
+        style: TextStyle(
+          fontSize: size * 0.4,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
     );
   }
 }

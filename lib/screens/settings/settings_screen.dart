@@ -5,6 +5,8 @@ import '../../constants/input_limits.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/settings_viewmodel.dart';
 
+enum _ProfileImageSource { gallery, camera }
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -14,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsViewModel _viewModel = SettingsViewModel();
+  bool _isPickingProfileImage = false;
 
   @override
   void initState() {
@@ -182,16 +185,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickAndUploadImage() async {
-    final error = await _viewModel.uploadProfileImage();
-    if (!mounted) return;
-    if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+    if (_isPickingProfileImage || _viewModel.isUploading) return;
+    setState(() {
+      _isPickingProfileImage = true;
+    });
+    final beforeImageUrl = _viewModel.user?.profileImage ?? '';
+    try {
+      final source = await showModalBottomSheet<_ProfileImageSource>(
+        context: context,
+        builder: (context) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('갤러리에서 선택'),
+                  onTap: () =>
+                      Navigator.pop(context, _ProfileImageSource.gallery),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('사진 찍기'),
+                  onTap: () => Navigator.pop(context, _ProfileImageSource.camera),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      if (source == null) return;
+
+      // Let bottom sheet route finish popping before opening image picker.
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final error = await _viewModel.uploadProfileImage(
+        useCamera: source == _ProfileImageSource.camera,
+      );
+      if (!mounted) return;
+      if (error != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+        return;
+      }
+      final afterImageUrl = _viewModel.user?.profileImage ?? '';
+      if (afterImageUrl.isNotEmpty && afterImageUrl != beforeImageUrl) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('프로필 사진이 변경되었습니다')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingProfileImage = false;
+        });
+      }
     }
   }
 
   Future<void> _requestPermission(Permission permission, String label) async {
+    final currentStatus = await permission.status;
+    if (!mounted) return;
+
+    if (currentStatus.isGranted || currentStatus.isLimited) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$label 권한을 끄려면 설정에서 변경해주세요.'),
+          action: SnackBarAction(
+            label: '설정 열기',
+            onPressed: () => openAppSettings(),
+          ),
+        ),
+      );
+      return;
+    }
+
     final status = await _viewModel.requestPermission(permission);
     if (!mounted) return;
     if (status.isGranted) {
@@ -220,6 +289,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('$label 권한이 거부되었습니다')));
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('계정 삭제 요청'),
+          content: const Text(
+            '계정 삭제를 요청하면 30일 뒤 계정과 모든 데이터가 완전히 삭제됩니다.\n'
+            '삭제 요청 UID는 d.house0827@gmail.com 으로 이메일 전송됩니다.\n\n'
+            '계속 진행할까요?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('삭제 요청'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    final error = await _viewModel.requestAccountDeletion();
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('계정 삭제가 요청되었습니다. 30일 후 계정과 데이터가 삭제됩니다.'),
+      ),
+    );
+    Navigator.of(context).pushReplacementNamed('/auth');
   }
 
   String _permissionStatusLabel(PermissionStatus? status) {
@@ -285,7 +397,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Profile Image
           GestureDetector(
-            onTap: _viewModel.isUploading ? null : _pickAndUploadImage,
+            onTap: (_viewModel.isUploading || _isPickingProfileImage)
+                ? null
+                : _pickAndUploadImage,
             child: Stack(
               children: [
                 Container(
@@ -295,25 +409,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     shape: BoxShape.circle,
                     color: AppColors.primaryLight,
                     border: Border.all(color: AppColors.primary, width: 3),
-                    image: _viewModel.user?.profileImage.isNotEmpty == true
-                        ? DecorationImage(
-                            image:
-                                NetworkImage(_viewModel.user!.profileImage),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
                   child: _viewModel.isUploading
                       ? const Center(
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : (_viewModel.user?.profileImage.isEmpty ?? true)
-                      ? const Icon(
-                          Icons.person,
-                          size: 50,
-                          color: AppColors.primary,
-                        )
-                      : null,
+                      : ClipOval(
+                          child: _viewModel.user?.profileImage.isNotEmpty == true
+                              ? Image.network(
+                                  _viewModel.user!.profileImage,
+                                  fit: BoxFit.cover,
+                                  width: 100,
+                                  height: 100,
+                                  errorBuilder: (_, _, _) => const Icon(
+                                    Icons.person,
+                                    size: 50,
+                                    color: AppColors.primary,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: AppColors.primary,
+                                ),
+                        ),
                 ),
                 Positioned(
                   right: 0,
@@ -511,6 +630,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Navigator.of(context).pushReplacementNamed('/auth');
               }
             },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
+            title: const Text(
+              '계정 삭제 요청',
+              style: TextStyle(fontSize: 16, color: Colors.red),
+            ),
+            subtitle: const Text(
+              '요청 후 30일 뒤 계정과 모든 데이터가 삭제됩니다',
+              style: TextStyle(fontSize: 12),
+            ),
+            onTap: _showDeleteAccountDialog,
           ),
         ],
       ),

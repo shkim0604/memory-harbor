@@ -74,13 +74,14 @@ class UserService {
       throw Exception('API base URL is missing');
     }
     final url = '$_apiBaseUrl/api/user/create';
-    final result = await _api.postJson(url, {
+    final payload = <String, dynamic>{
       'name': name,
       'email': email,
-      if (profileImage != null) 'profileImage': profileImage,
+      'profileImage': profileImage,
       'introMessage': introMessage,
       'groupIds': groupIds,
-    });
+    }..removeWhere((_, value) => value == null);
+    final result = await _api.postJson(url, payload);
     if (result == null) {
       throw Exception('Failed to create user');
     }
@@ -126,7 +127,21 @@ class UserService {
   // Update user profile image
   // ============================================================================
   Future<void> updateUserProfileImage(String uid, String profileImage) async {
-    await updateUser(uid, {'profileImage': profileImage});
+    final cleaned = profileImage.trim();
+    if (cleaned.isEmpty) {
+      throw Exception('profileImage URL is empty');
+    }
+
+    // Source of truth for client reads is Firestore users/{uid}.
+    await _usersCollection.doc(uid).set({
+      'profileImage': cleaned,
+      'lastActivityAt': TimeUtils.nowEt().toIso8601String(),
+    }, SetOptions(merge: true));
+
+    // Keep backend in sync as best-effort without blocking UX.
+    try {
+      await updateUser(uid, {'profileImage': cleaned});
+    } catch (_) {}
   }
 
   // ============================================================================
@@ -155,6 +170,61 @@ class UserService {
     if (!ok) {
       throw Exception('Failed to delete user');
     }
+  }
+
+  // ============================================================================
+  // Request account deletion (30-day grace period)
+  // ============================================================================
+  Future<void> requestAccountDeletion({
+    required String uid,
+    required String email,
+  }) async {
+    final requestedAt = TimeUtils.nowEt();
+    final scheduledDeleteAt = requestedAt.add(const Duration(days: 30));
+    const notifyEmail = 'd.house0827@gmail.com';
+
+    await _usersCollection.doc(uid).set({
+      'deletionStatus': 'requested',
+      'deletionRequestedAt': requestedAt.toIso8601String(),
+      'scheduledDeletionAt': scheduledDeleteAt.toIso8601String(),
+      'lastActivityAt': requestedAt.toIso8601String(),
+    }, SetOptions(merge: true));
+
+    await _firestore.collection('userDeletionRequests').doc(uid).set({
+      'uid': uid,
+      'email': email,
+      'status': 'requested',
+      'requestedAt': requestedAt.toIso8601String(),
+      'scheduledDeleteAt': scheduledDeleteAt.toIso8601String(),
+      'notifyEmail': notifyEmail,
+    }, SetOptions(merge: true));
+
+    if (_apiBaseUrl.trim().isEmpty) {
+      throw Exception('API base URL is missing');
+    }
+
+    final payload = <String, dynamic>{
+      'uid': uid,
+      'email': email,
+      'notifyEmail': notifyEmail,
+      'requestedAt': requestedAt.toIso8601String(),
+      'scheduledDeleteAt': scheduledDeleteAt.toIso8601String(),
+    };
+
+    final primaryUrl = '$_apiBaseUrl/api/user/delete-request';
+    final secondaryUrl = '$_apiBaseUrl/api/user/deletion-request';
+    final sentPrimary = await _api.postJsonOk(primaryUrl, payload);
+    final sentSecondary = sentPrimary
+        ? true
+        : await _api.postJsonOk(secondaryUrl, payload);
+    if (!sentSecondary) {
+      throw Exception('Failed to send account deletion request email');
+    }
+
+    await _firestore.collection('userDeletionRequests').doc(uid).set({
+      'emailSent': true,
+      'emailSentAt': TimeUtils.nowEt().toIso8601String(),
+    }, SetOptions(merge: true));
   }
 
   // ============================================================================
