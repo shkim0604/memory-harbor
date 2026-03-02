@@ -15,29 +15,40 @@ class ReviewWriteScreen extends StatefulWidget {
 }
 
 class _TopicOption {
-  final String residenceId;
-  final String era;
-  final String location;
-  final String detail;
+  final String value;
+  final String topicType;
+  final String topicId;
+  final String label;
+  final String question;
+  final Map<String, dynamic>? residencePayload;
 
   const _TopicOption({
-    required this.residenceId,
-    required this.era,
-    required this.location,
-    required this.detail,
+    required this.value,
+    required this.topicType,
+    required this.topicId,
+    required this.label,
+    required this.question,
+    this.residencePayload,
   });
 
-  Map<String, dynamic> toJson() => {
-    'residenceId': residenceId,
-    'era': era,
-    'location': location,
-    'detail': detail,
-  };
+  bool get isResidence => topicType == 'residence';
+  bool get isMeaning => topicType == 'meaning';
+  String? get residenceId => isResidence ? topicId : null;
+  String? get meaningId => isMeaning ? topicId : null;
+}
 
-  String get label {
-    if (era.isNotEmpty) return '$era · $location';
-    return location;
-  }
+class _MeaningQuestionOption {
+  final String meaningId;
+  final int order;
+  final String title;
+  final String question;
+
+  const _MeaningQuestionOption({
+    required this.meaningId,
+    required this.order,
+    required this.title,
+    required this.question,
+  });
 }
 
 class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
@@ -54,7 +65,39 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
   bool _isSubmitting = false;
   String? _existingMyReviewDocId;
   List<_TopicOption> _topicOptions = const [];
-  String? _selectedTopicResidenceId;
+  String? _selectedTopicValue;
+  static const List<_MeaningQuestionOption> _defaultMeaningQuestions = [
+    _MeaningQuestionOption(
+      meaningId: 'meaning_legacy_event',
+      order: 1,
+      title: '꼭 남기고 싶은 사건',
+      question: '남은 사람들이 꼭 기억해줬으면 하는 사건은 무엇인가요?',
+    ),
+    _MeaningQuestionOption(
+      meaningId: 'meaning_work_memory',
+      order: 2,
+      title: '직장생활 기억',
+      question: '직장생활에서 가장 기억에 남는 사건은 무엇인가요?',
+    ),
+    _MeaningQuestionOption(
+      meaningId: 'meaning_church_memory',
+      order: 3,
+      title: '교회생활 기억',
+      question: '교회생활에서 가장 기억에 남는 사건은 무엇인가요?',
+    ),
+    _MeaningQuestionOption(
+      meaningId: 'meaning_influential_person',
+      order: 4,
+      title: '영향을 준 사람',
+      question: '인생에서 가장 큰 영향을 받은 사람은 누구인가요?',
+    ),
+    _MeaningQuestionOption(
+      meaningId: 'meaning_rewind_moment',
+      order: 5,
+      title: '돌아가고 싶은 순간',
+      question: '인생에서 다시 돌아가고 싶은 순간이 있다면 언제인가요?',
+    ),
+  ];
   static const List<String> _emotionSourceOptions = ['내 것', '상대 것', '감정섞임'];
   final DateTime _requiredStepOpenedAt = DateTime.now();
   int? _requiredDurationSec;
@@ -117,35 +160,56 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         final first = Map<String, dynamic>.from(mentioned.first as Map);
         final rid = (first['residenceId'] ?? '').toString();
         if (rid.isNotEmpty) {
-          _selectedTopicResidenceId = rid;
+          _selectedTopicValue = _topicValue('residence', rid);
         }
+      }
+      final selectedMeaningId = (callData['selectedMeaningId'] ?? '')
+          .toString()
+          .trim();
+      if (selectedMeaningId.isNotEmpty) {
+        _selectedTopicValue = _topicValue('meaning', selectedMeaningId);
       }
 
       final receiverId = (callData['receiverId'] ?? '').toString();
       if (receiverId.isEmpty) return;
 
-      final residenceSnap = await FirebaseFirestore.instance
+      final receiverRef = FirebaseFirestore.instance
           .collection('receivers')
-          .doc(receiverId)
-          .collection('residence_stats')
-          .get();
+          .doc(receiverId);
 
-      final options = residenceSnap.docs.map((doc) {
+      final snaps = await Future.wait([
+        receiverRef.collection('residence_stats').get(),
+        receiverRef.collection('meaning_stats').get(),
+      ]);
+      final residenceSnap = snaps[0];
+      final meaningSnap = snaps[1];
+
+      final residenceOptions = residenceSnap.docs.map((doc) {
         final data = doc.data();
+        final era = (data['era'] ?? '').toString();
+        final location = (data['location'] ?? '').toString();
+        final detail = (data['detail'] ?? '').toString();
+        final label = era.isNotEmpty ? '$era · $location' : location;
         return _TopicOption(
-          residenceId: doc.id,
-          era: (data['era'] ?? '').toString(),
-          location: (data['location'] ?? '').toString(),
-          detail: (data['detail'] ?? '').toString(),
+          value: _topicValue('residence', doc.id),
+          topicType: 'residence',
+          topicId: doc.id,
+          label: '[시대] $label',
+          question: detail,
+          residencePayload: {
+            'residenceId': doc.id,
+            'era': era,
+            'location': location,
+            'detail': detail,
+          },
         );
       }).toList();
 
-      _topicOptions = options;
-      if (_selectedTopicResidenceId != null &&
-          !_topicOptions.any(
-            (topic) => topic.residenceId == _selectedTopicResidenceId,
-          )) {
-        _selectedTopicResidenceId = null;
+      final meaningOptions = _buildMeaningTopicOptions(meaningSnap);
+      _topicOptions = [...residenceOptions, ...meaningOptions];
+      if (_selectedTopicValue != null &&
+          !_topicOptions.any((topic) => topic.value == _selectedTopicValue)) {
+        _selectedTopicValue = null;
       }
     } catch (_) {
       // Keep UI usable even when call context load fails.
@@ -188,11 +252,19 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
 
       _smallResetController.text = (data['smallReset'] ?? '').toString();
 
+      final selectedTopicType = (data['selectedTopicType'] ?? '')
+          .toString()
+          .trim();
+      final selectedMeaningId = (data['selectedMeaningId'] ?? '')
+          .toString()
+          .trim();
       final selectedResidenceId = (data['selectedResidenceId'] ?? '')
           .toString()
           .trim();
-      if (selectedResidenceId.isNotEmpty) {
-        _selectedTopicResidenceId = selectedResidenceId;
+      if (selectedTopicType == 'meaning' && selectedMeaningId.isNotEmpty) {
+        _selectedTopicValue = _topicValue('meaning', selectedMeaningId);
+      } else if (selectedResidenceId.isNotEmpty) {
+        _selectedTopicValue = _topicValue('residence', selectedResidenceId);
       } else {
         final mentioned = data['mentionedResidences'];
         if (mentioned is List &&
@@ -201,7 +273,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
           final first = Map<String, dynamic>.from(mentioned.first as Map);
           final rid = (first['residenceId'] ?? '').toString().trim();
           if (rid.isNotEmpty) {
-            _selectedTopicResidenceId = rid;
+            _selectedTopicValue = _topicValue('residence', rid);
           }
         }
       }
@@ -234,7 +306,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     final emotionWord = _emotionWordController.text.trim();
     final emotionSource = _emotionSource.trim();
     final callMemo = _callMemoController.text.trim();
-    final selectedTopicResidenceId = _selectedTopicResidenceId?.trim();
+    final selectedTopicValue = _selectedTopicValue?.trim();
     final listeningScore = _listeningScore;
 
     setState(() {
@@ -249,16 +321,19 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
       const comment = '';
 
       final selectedTopic = _topicOptions
-          .where((topic) => topic.residenceId == selectedTopicResidenceId)
+          .where((topic) => topic.value == selectedTopicValue)
           .cast<_TopicOption?>()
           .firstWhere((_) => true, orElse: () => null);
-      final mentionedResidences = selectedTopic != null
-          ? <Map<String, dynamic>>[selectedTopic.toJson()]
+      final mentionedResidences =
+          selectedTopic?.isResidence == true &&
+              selectedTopic?.residencePayload != null
+          ? <Map<String, dynamic>>[
+              Map<String, dynamic>.from(selectedTopic!.residencePayload!),
+            ]
           : const <Map<String, dynamic>>[];
 
       final firestore = FirebaseFirestore.instance;
       final callRef = firestore.collection('calls').doc(callId);
-      final batch = firestore.batch();
       final requiredDurationSec =
           _requiredDurationSec ??
           DateTime.now()
@@ -271,7 +346,12 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         'writerUserId': uid,
         'writerNameSnapshot': writerName,
         'mentionedResidences': mentionedResidences,
+        'selectedTopicType': selectedTopic?.topicType,
+        'selectedTopicId': selectedTopic?.topicId,
+        'selectedTopicLabel': selectedTopic?.label,
+        'selectedTopicQuestion': selectedTopic?.question,
         'selectedResidenceId': selectedTopic?.residenceId,
+        'selectedMeaningId': selectedTopic?.meaningId,
         'humanSummary': summary,
         'humanKeywords': const [],
         'mood': emotionWord,
@@ -285,57 +365,123 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         'requiredQuestionDurationSec': requiredDurationSec,
       };
 
-      if (_existingMyReviewDocId != null) {
-        final reviewRef = callRef
-            .collection('reviews')
-            .doc(_existingMyReviewDocId);
-        batch.update(reviewRef, <String, dynamic>{
-          ...payload,
-          'lastWriteDurationSec': requiredDurationSec,
-          'lastWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
-          'lastWriteType': 'edit',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-        final logRef = reviewRef.collection('write_logs').doc();
-        batch.set(logRef, <String, dynamic>{
-          'type': 'edit',
-          'durationSec': requiredDurationSec,
-          'startedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
-          'phase': 'required',
-          'savedAt': FieldValue.serverTimestamp(),
-        });
-        batch.update(callRef, <String, dynamic>{
-          'humanNotes': callMemo,
-          if (selectedTopic != null) 'mentionedResidences': mentionedResidences,
-        });
-      } else {
-        final reviewRef = callRef.collection('reviews').doc();
-        batch.set(reviewRef, <String, dynamic>{
-          ...payload,
-          'firstWriteDurationSec': requiredDurationSec,
-          'firstWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
-          'lastWriteDurationSec': requiredDurationSec,
-          'lastWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
-          'lastWriteType': 'create',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        final logRef = reviewRef.collection('write_logs').doc();
-        batch.set(logRef, <String, dynamic>{
-          'type': 'create',
-          'durationSec': requiredDurationSec,
-          'startedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
-          'phase': 'required',
-          'savedAt': FieldValue.serverTimestamp(),
-        });
-        batch.update(callRef, <String, dynamic>{
-          'reviewCount': FieldValue.increment(1),
-          'lastReviewAt': FieldValue.serverTimestamp(),
-          'humanNotes': callMemo,
-          if (selectedTopic != null) 'mentionedResidences': mentionedResidences,
-        });
-      }
+      await firestore.runTransaction((tx) async {
+        final callSnap = await tx.get(callRef);
+        if (!callSnap.exists) {
+          throw StateError('call document not found: $callId');
+        }
+        final callBeforeData = callSnap.data() ?? <String, dynamic>{};
+        final receiverId = (callBeforeData['receiverId'] ?? '')
+            .toString()
+            .trim();
 
-      await batch.commit();
+        final reviewRef = _existingMyReviewDocId != null
+            ? callRef.collection('reviews').doc(_existingMyReviewDocId)
+            : callRef.collection('reviews').doc();
+        final reviewSnap = await tx.get(reviewRef);
+        final isEdit = reviewSnap.exists;
+
+        Set<String> removedResidenceIds = const <String>{};
+        Set<String> addedResidenceIds = const <String>{};
+        Set<String> removedMeaningIds = const <String>{};
+        Set<String> addedMeaningIds = const <String>{};
+        Map<String, int> residenceCurrentById = const <String, int>{};
+        Map<String, int> meaningCurrentById = const <String, int>{};
+        DocumentReference<Map<String, dynamic>>? receiverRef;
+
+        if (receiverId.isNotEmpty) {
+          receiverRef = firestore.collection('receivers').doc(receiverId);
+          final beforeResidenceIds = _extractResidenceIdsFromCallData(
+            callBeforeData,
+          );
+          final afterResidenceIds = _extractResidenceIdsFromPayload(
+            mentionedResidences,
+          );
+          final beforeMeaningId = _extractMeaningIdFromCallData(callBeforeData);
+          final afterMeaningId = selectedTopic?.topicType == 'meaning'
+              ? (selectedTopic?.meaningId ?? '').trim()
+              : '';
+
+          removedResidenceIds = beforeResidenceIds.difference(afterResidenceIds);
+          addedResidenceIds = afterResidenceIds.difference(beforeResidenceIds);
+          final beforeMeaningSet = beforeMeaningId.isEmpty
+              ? const <String>{}
+              : {beforeMeaningId};
+          final afterMeaningSet = afterMeaningId.isEmpty
+              ? const <String>{}
+              : {afterMeaningId};
+          removedMeaningIds = beforeMeaningSet.difference(afterMeaningSet);
+          addedMeaningIds = afterMeaningSet.difference(beforeMeaningSet);
+
+          residenceCurrentById = await _readCurrentTotalCalls(
+            tx: tx,
+            collectionRef: receiverRef.collection('residence_stats'),
+            ids: {...removedResidenceIds, ...addedResidenceIds},
+          );
+          meaningCurrentById = await _readCurrentTotalCalls(
+            tx: tx,
+            collectionRef: receiverRef.collection('meaning_stats'),
+            ids: {...removedMeaningIds, ...addedMeaningIds},
+          );
+        }
+
+        if (isEdit) {
+          tx.update(reviewRef, <String, dynamic>{
+            ...payload,
+            'lastWriteDurationSec': requiredDurationSec,
+            'lastWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+            'lastWriteType': 'edit',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.set(reviewRef, <String, dynamic>{
+            ...payload,
+            'firstWriteDurationSec': requiredDurationSec,
+            'firstWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+            'lastWriteDurationSec': requiredDurationSec,
+            'lastWriteStartedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+            'lastWriteType': 'create',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+
+        final logRef = reviewRef.collection('write_logs').doc();
+        tx.set(logRef, <String, dynamic>{
+          'type': isEdit ? 'edit' : 'create',
+          'durationSec': requiredDurationSec,
+          'startedAtClient': Timestamp.fromDate(_requiredStepOpenedAt),
+          'phase': 'required',
+          'savedAt': FieldValue.serverTimestamp(),
+        });
+
+        tx.update(callRef, <String, dynamic>{
+          if (!isEdit) 'reviewCount': FieldValue.increment(1),
+          if (!isEdit) 'lastReviewAt': FieldValue.serverTimestamp(),
+          'humanNotes': callMemo,
+          'selectedTopicType': selectedTopic?.topicType,
+          'selectedTopicId': selectedTopic?.topicId,
+          'selectedResidenceId': selectedTopic?.residenceId,
+          'selectedMeaningId': selectedTopic?.meaningId,
+          'mentionedResidences': mentionedResidences,
+        });
+
+        if (receiverRef != null) {
+          _applyCounterDeltaForIds(
+            tx: tx,
+            collectionRef: receiverRef.collection('residence_stats'),
+            removedIds: removedResidenceIds,
+            addedIds: addedResidenceIds,
+            currentById: residenceCurrentById,
+          );
+          _applyCounterDeltaForIds(
+            tx: tx,
+            collectionRef: receiverRef.collection('meaning_stats'),
+            removedIds: removedMeaningIds,
+            addedIds: addedMeaningIds,
+            currentById: meaningCurrentById,
+          );
+        }
+      });
       await LocalCallMemoService.instance.removeMemo(callId);
 
       if (!mounted) return;
@@ -363,10 +509,10 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     final nextSessionTry = _nextTryController.text.trim();
     final emotionWord = _emotionWordController.text.trim();
     final emotionSource = _emotionSource.trim();
-    final selectedTopicResidenceId = _selectedTopicResidenceId?.trim();
+    final selectedTopicValue = _selectedTopicValue?.trim();
     final listeningScore = _listeningScore;
 
-    if (selectedTopicResidenceId == null || selectedTopicResidenceId.isEmpty) {
+    if (selectedTopicValue == null || selectedTopicValue.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('1. 대화주제를 선택해주세요')));
@@ -405,6 +551,90 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     return true;
   }
 
+  Set<String> _extractResidenceIdsFromCallData(Map<String, dynamic> data) {
+    final result = <String>{};
+    final mentioned = data['mentionedResidences'];
+    if (mentioned is! List) return result;
+    for (final item in mentioned) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final id = (map['residenceId'] ?? '').toString().trim();
+      if (id.isNotEmpty) result.add(id);
+    }
+    return result;
+  }
+
+  Set<String> _extractResidenceIdsFromPayload(
+    List<Map<String, dynamic>> mentionedResidences,
+  ) {
+    final result = <String>{};
+    for (final item in mentionedResidences) {
+      final id = (item['residenceId'] ?? '').toString().trim();
+      if (id.isNotEmpty) result.add(id);
+    }
+    return result;
+  }
+
+  String _extractMeaningIdFromCallData(Map<String, dynamic> data) {
+    final selectedMeaningId = (data['selectedMeaningId'] ?? '')
+        .toString()
+        .trim();
+    if (selectedMeaningId.isNotEmpty) return selectedMeaningId;
+
+    final selectedTopicType = (data['selectedTopicType'] ?? '')
+        .toString()
+        .trim();
+    if (selectedTopicType == 'meaning') {
+      return (data['selectedTopicId'] ?? '').toString().trim();
+    }
+    return '';
+  }
+
+  Future<Map<String, int>> _readCurrentTotalCalls({
+    required Transaction tx,
+    required CollectionReference<Map<String, dynamic>> collectionRef,
+    required Set<String> ids,
+  }) async {
+    final result = <String, int>{};
+    for (final id in ids) {
+      final snap = await tx.get(collectionRef.doc(id));
+      final data = snap.data() ?? const <String, dynamic>{};
+      result[id] = (data['totalCalls'] is num)
+          ? (data['totalCalls'] as num).toInt()
+          : 0;
+    }
+    return result;
+  }
+
+  void _applyCounterDeltaForIds({
+    required Transaction tx,
+    required CollectionReference<Map<String, dynamic>> collectionRef,
+    required Set<String> removedIds,
+    required Set<String> addedIds,
+    required Map<String, int> currentById,
+  }) {
+    for (final id in removedIds) {
+      final docRef = collectionRef.doc(id);
+      final current = currentById[id] ?? 0;
+      final next = (current - 1).clamp(0, 1 << 30);
+      tx.set(docRef, <String, dynamic>{
+        'totalCalls': next,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
+    for (final id in addedIds) {
+      final docRef = collectionRef.doc(id);
+      final current = currentById[id] ?? 0;
+      final next = current + 1;
+      tx.set(docRef, <String, dynamic>{
+        'totalCalls': next,
+        'lastCallAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+  }
+
   void _goToOptionalStep() {
     if (!_validateRequiredFields()) return;
     setState(() {
@@ -437,7 +667,7 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     return [
       _buildStepHeader('1/2 단계 · 필수 질문'),
       const SizedBox(height: 16),
-      _buildSectionTitle('1. 대화주제: 시대별 거주지'),
+      _buildSectionTitle('1. 대화주제 선택 (시대/의미)'),
       const SizedBox(height: 8),
       _buildTopicDropdown(),
       const SizedBox(height: 20),
@@ -597,18 +827,18 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     }
     if (_topicOptions.isEmpty) {
       return Text(
-        '표시할 거주지 주제가 없습니다',
+        '표시할 대화 주제가 없습니다',
         style: TextStyle(fontSize: 14, color: AppColors.textHint),
       );
     }
     return DropdownButtonFormField<String>(
-      initialValue: _selectedTopicResidenceId,
+      initialValue: _selectedTopicValue,
       isExpanded: true,
       decoration: _dropdownDecoration('대화 주제를 선택하세요'),
       items: _topicOptions
           .map(
             (topic) => DropdownMenuItem<String>(
-              value: topic.residenceId,
+              value: topic.value,
               child: Text(
                 topic.label,
                 style: const TextStyle(fontSize: 15),
@@ -619,10 +849,42 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
           .toList(),
       onChanged: (value) {
         setState(() {
-          _selectedTopicResidenceId = value;
+          _selectedTopicValue = value;
         });
       },
     );
+  }
+
+  String _topicValue(String type, String id) => '$type::$id';
+
+  List<_TopicOption> _buildMeaningTopicOptions(
+    QuerySnapshot<Map<String, dynamic>> meaningSnap,
+  ) {
+    final questions = meaningSnap.docs.isNotEmpty
+        ? meaningSnap.docs
+              .map((doc) {
+                final data = doc.data();
+                return _MeaningQuestionOption(
+                  meaningId: doc.id,
+                  order: (data['order'] ?? 999) as int,
+                  title: (data['title'] ?? '').toString(),
+                  question: (data['question'] ?? '').toString(),
+                );
+              })
+              .toList()
+        : _defaultMeaningQuestions;
+    questions.sort((a, b) => a.order.compareTo(b.order));
+    return questions
+        .map(
+          (item) => _TopicOption(
+            value: _topicValue('meaning', item.meaningId),
+            topicType: 'meaning',
+            topicId: item.meaningId,
+            label: '[의미] Q${item.order}. ${item.question}',
+            question: item.question,
+          ),
+        )
+        .toList();
   }
 
   Widget _buildScoreDropdown() {

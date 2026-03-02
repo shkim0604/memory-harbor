@@ -6,5 +6,6 @@ export 'user.dart';
 export 'group.dart';
 export 'care_receiver.dart';
 export 'residence.dart';
+export 'meaning.dart';
 export 'review.dart';
 export 'call.dart';

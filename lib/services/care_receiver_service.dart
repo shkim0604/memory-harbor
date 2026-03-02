@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/care_receiver.dart';
+import '../models/meaning.dart';
 import '../models/residence.dart';
 
 class CareReceiverService {
@@ -38,6 +39,21 @@ class CareReceiverService {
             final data = doc.data();
             return ResidenceStats.fromJson({...data, 'residenceId': doc.id});
           }).toList();
+        });
+  }
+
+  Stream<List<MeaningStats>> streamMeaningStats(String receiverId) {
+    return _receiversCollection
+        .doc(receiverId)
+        .collection('meaning_stats')
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return MeaningStats.fromJson({...data, 'meaningId': doc.id});
+          }).toList();
+          list.sort((a, b) => a.order.compareTo(b.order));
+          return list;
         });
   }
 }

@@ -37,6 +37,7 @@ class _CallScreenState extends State<CallScreen> {
   final CallViewModel _viewModel = CallViewModel();
   final CallSessionViewModel _session = CallSessionViewModel.instance;
   int? _selectedResidenceIndex;
+  int? _selectedMeaningIndex;
   late final VoidCallback _onSessionChanged;
   bool _autoStarted = false;
   bool _autoStartPending = false;
@@ -270,9 +271,37 @@ class _CallScreenState extends State<CallScreen> {
     return Column(
       children: [
         _buildStatusSection(receiver),
-        Expanded(child: _buildResidenceSection(receiver, _viewModel.statsList)),
+        Expanded(
+          child: _buildTopicSection(
+            receiver: receiver,
+            statsList: _viewModel.statsList,
+            meaningList: _viewModel.meaningList,
+          ),
+        ),
         _buildControlSection(),
       ],
+    );
+  }
+
+  Widget _buildTopicSection({
+    required CareReceiver receiver,
+    required List<ResidenceStats> statsList,
+    required List<MeaningStats> meaningList,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          Expanded(child: _buildResidenceSection(receiver, statsList)),
+          const SizedBox(height: 12),
+          Expanded(
+            child: _buildMeaningSection(
+              receiverId: receiver.receiverId,
+              meaningList: meaningList,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -281,7 +310,7 @@ class _CallScreenState extends State<CallScreen> {
   // ============================================================
   Widget _buildStatusSection(CareReceiver receiver) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
       child: Column(
         children: [
           Column(
@@ -294,9 +323,9 @@ class _CallScreenState extends State<CallScreen> {
                     child: _buildPipButton(),
                   ),
                   Text(
-                    receiver.name,
+                    '추천 대화 주제',
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -333,7 +362,6 @@ class _CallScreenState extends State<CallScreen> {
     List<ResidenceStats> statsList,
   ) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -354,10 +382,13 @@ class _CallScreenState extends State<CallScreen> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const Spacer(),
               Text(
-                '대화 주제를 선택하세요',
-                style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                ' (${statsList.length})',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -373,6 +404,7 @@ class _CallScreenState extends State<CallScreen> {
                   era: stats.era,
                   location: stats.location,
                   detail: stats.detail,
+                  totalCalls: stats.totalCalls,
                   isSelected: isSelected,
                   onTap: () {
                     setState(() {
@@ -402,10 +434,99 @@ class _CallScreenState extends State<CallScreen> {
     );
   }
 
+  Widget _buildMeaningSection({
+    required String receiverId,
+    required List<MeaningStats> meaningList,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.lightbulb_outline,
+                color: AppColors.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '의미 중심 질문',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                ' (${meaningList.length})',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: meaningList.isEmpty
+                ? Center(
+                    child: Text(
+                      '질문 데이터를 불러오는 중...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: meaningList.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = meaningList[index];
+                      final isSelected = _selectedMeaningIndex == index;
+                      return _buildMeaningCard(
+                        order: item.order,
+                        question: item.question,
+                        totalCalls: item.totalCalls,
+                        isSelected: isSelected,
+                        onTap: () {
+                          setState(() {
+                            _selectedMeaningIndex = isSelected ? null : index;
+                          });
+                          if (!isSelected) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    CallDetailScreen.forMeaning(
+                                      receiverId: receiverId,
+                                      meaning: item,
+                                    ),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResidenceCard({
     required String era,
     required String location,
     required String detail,
+    required int totalCalls,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
@@ -425,6 +546,7 @@ class _CallScreenState extends State<CallScreen> {
           ),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -465,17 +587,120 @@ class _CallScreenState extends State<CallScreen> {
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: isSelected ? AppColors.primary : AppColors.textHint,
-              size: 16,
-            ),
+            const SizedBox(width: 12),
+            _buildCallCountChip(totalCalls, isSelected),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMeaningCard({
+    required int order,
+    required String question,
+    required int totalCalls,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryLight.withValues(alpha: 0.3)
+              : AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.secondary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$order',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected ? Colors.white : AppColors.secondary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    question,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppColors.primaryDark
+                          : AppColors.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            _buildCallCountChip(totalCalls, isSelected),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCallCountChip(int totalCalls, bool isSelected) {
+    final bgColor = isSelected
+        ? AppColors.primary.withValues(alpha: 0.12)
+        : AppColors.secondary.withValues(alpha: 0.08);
+    final fgColor = isSelected
+        ? AppColors.primaryDark
+        : AppColors.textSecondary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.call_outlined, size: 12, color: fgColor),
+          const SizedBox(width: 4),
+          Text(
+            '$totalCalls회',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: fgColor,
+            ),
+          ),
+        ],
       ),
     );
   }

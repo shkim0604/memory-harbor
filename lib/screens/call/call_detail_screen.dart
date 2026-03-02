@@ -14,6 +14,10 @@ class CallDetailScreen extends StatefulWidget {
   final String location;
   final String detail;
   final String receiverId;
+  final String topicType;
+  final String topicId;
+  final List<InterviewGuideStep> interviewGuide;
+  final List<String> exampleQuestions;
 
   const CallDetailScreen({
     super.key,
@@ -22,7 +26,30 @@ class CallDetailScreen extends StatefulWidget {
     required this.location,
     required this.detail,
     required this.receiverId,
+    this.topicType = 'residence',
+    this.topicId = '',
+    this.interviewGuide = const [],
+    this.exampleQuestions = const [],
   });
+
+  factory CallDetailScreen.forMeaning({
+    Key? key,
+    required String receiverId,
+    required MeaningStats meaning,
+  }) {
+    return CallDetailScreen(
+      key: key,
+      residenceId: '',
+      era: '질문 ${meaning.order}',
+      location: meaning.title,
+      detail: meaning.question,
+      receiverId: receiverId,
+      topicType: 'meaning',
+      topicId: meaning.meaningId,
+      interviewGuide: meaning.interviewGuide,
+      exampleQuestions: meaning.exampleQuestions,
+    );
+  }
 
   @override
   State<CallDetailScreen> createState() => _CallDetailScreenState();
@@ -71,7 +98,8 @@ class _CallDetailScreenState extends State<CallDetailScreen>
     _session.addListener(_onSessionChanged);
     _viewModel.init(
       receiverId: widget.receiverId,
-      residenceId: widget.residenceId,
+      topicType: widget.topicType,
+      topicId: widget.topicType == 'meaning' ? widget.topicId : widget.residenceId,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -131,6 +159,10 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // 세션 가이드
   // ============================================================
   Widget _buildSessionGuideCard() {
+    final sessionGuideSteps = widget.topicType == 'meaning'
+        ? _buildMeaningGuideSteps()
+        : _sessionGuideSteps;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
@@ -151,10 +183,36 @@ class _CallDetailScreenState extends State<CallDetailScreen>
             ),
           ),
           const SizedBox(height: 12),
-          ..._sessionGuideSteps.map(_buildSessionGuideStep),
+          ...sessionGuideSteps.map(_buildSessionGuideStep),
         ],
       ),
     );
+  }
+
+  List<_SessionGuideStep> _buildMeaningGuideSteps() {
+    final guide = widget.interviewGuide;
+    if (guide.isNotEmpty) {
+      return guide
+          .map(
+            (step) => _SessionGuideStep(
+              title:
+                  '[Step ${step.step}] ${step.label.isNotEmpty ? step.label : step.key}',
+              examples: step.prompts,
+            ),
+          )
+          .toList();
+    }
+
+    if (widget.exampleQuestions.isNotEmpty) {
+      return [
+        _SessionGuideStep(
+          title: '[Step 1] Memory',
+          examples: widget.exampleQuestions,
+        ),
+      ];
+    }
+
+    return _sessionGuideSteps;
   }
 
   Widget _buildSessionGuideStep(_SessionGuideStep step) {
@@ -448,6 +506,18 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // 이전 통화요약 섹션
   // ============================================================
   Widget _buildPreviousCallsSection(List<Call> previousCalls) {
+    if (previousCalls.isEmpty) {
+      return const Center(
+        child: Text(
+          '이 주제의 이전 통화 기록이 아직 없습니다',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -732,14 +802,14 @@ class _CallDetailScreenState extends State<CallDetailScreen>
     final duration = Duration(seconds: seconds);
     final totalMinutes = duration.inMinutes;
     if (totalMinutes < 60) {
-      return '${totalMinutes}분';
+      return '$totalMinutes분';
     }
     final hours = duration.inHours;
     final minutes = totalMinutes % 60;
     if (minutes == 0) {
-      return '${hours}시간';
+      return '$hours시간';
     }
-    return '${hours}시간 ${minutes}분';
+    return '$hours시간 $minutes분';
   }
 
   String _formatDate(DateTime dateTime) {

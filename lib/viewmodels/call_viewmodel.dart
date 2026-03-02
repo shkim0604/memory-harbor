@@ -23,11 +23,15 @@ class CallViewModel {
   Group? group;
   CareReceiver? receiver;
   List<ResidenceStats> statsList = const [];
+  List<MeaningStats> meaningList = const [];
 
   StreamSubscription<AppUser?>? _userSub;
   StreamSubscription<Group?>? _groupSub;
   StreamSubscription<CareReceiver?>? _receiverSub;
   StreamSubscription<List<ResidenceStats>>? _statsSub;
+  StreamSubscription<List<MeaningStats>>? _meaningSub;
+  bool _receivedResidenceStats = false;
+  bool _receivedMeaningStats = false;
 
   void Function()? _onChanged;
 
@@ -69,6 +73,7 @@ class CallViewModel {
     _groupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
+    _meaningSub?.cancel();
     _onChanged = null;
   }
 
@@ -105,11 +110,13 @@ class CallViewModel {
       }
 
       _subscribeResidenceStats(nextReceiver.receiverId);
+      _subscribeMeaningStats(nextReceiver.receiverId);
     });
   }
 
   void _subscribeResidenceStats(String receiverId) {
     _statsSub?.cancel();
+    _receivedResidenceStats = false;
     status = CallDataStatus.loadingStats;
     _onChanged?.call();
 
@@ -117,7 +124,26 @@ class CallViewModel {
         .streamResidenceStats(receiverId)
         .listen((nextStats) {
       statsList = nextStats;
-      status = CallDataStatus.ready;
+      _receivedResidenceStats = true;
+      if (_receivedResidenceStats && _receivedMeaningStats) {
+        status = CallDataStatus.ready;
+      }
+      _onChanged?.call();
+    });
+  }
+
+  void _subscribeMeaningStats(String receiverId) {
+    _meaningSub?.cancel();
+    _receivedMeaningStats = false;
+
+    _meaningSub = CareReceiverService.instance
+        .streamMeaningStats(receiverId)
+        .listen((nextMeaning) {
+      meaningList = nextMeaning;
+      _receivedMeaningStats = true;
+      if (_receivedResidenceStats && _receivedMeaningStats) {
+        status = CallDataStatus.ready;
+      }
       _onChanged?.call();
     });
   }
@@ -126,8 +152,12 @@ class CallViewModel {
     group = null;
     receiver = null;
     statsList = const [];
+    meaningList = const [];
     _groupSub?.cancel();
     _receiverSub?.cancel();
     _statsSub?.cancel();
+    _meaningSub?.cancel();
+    _receivedResidenceStats = false;
+    _receivedMeaningStats = false;
   }
 }
