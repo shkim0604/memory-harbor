@@ -340,10 +340,27 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   Future<void> _autoStartCall() async {
     final payload = widget.payload;
     if (payload == null) return;
-    final ok = await _session.acceptIncoming(context, payload: payload);
-    if (!ok) {
-      _accepted = false;
+    final sameCallInProgress =
+        _session.currentCallId == payload.callId &&
+        (_session.status == CallSessionState.connecting ||
+            _session.status == CallSessionState.onCall);
+    if (sameCallInProgress) {
+      _accepted = true;
       if (mounted) setState(() {});
+      return;
+    }
+    if (_starting || _actionLocked) return;
+    _starting = true;
+    _actionLocked = true;
+    try {
+      final ok = await _session.acceptIncoming(context, payload: payload);
+      if (!ok) {
+        _accepted = false;
+        if (mounted) setState(() {});
+      }
+    } finally {
+      _starting = false;
+      _actionLocked = false;
     }
   }
 

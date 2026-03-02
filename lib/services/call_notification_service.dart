@@ -35,6 +35,7 @@ class CallNotificationService {
   final Map<String, DateTime> _callkitShownAt = {};
   final Map<String, DateTime> _incomingEmittedAt = {};
   final Set<String> _acceptHandled = {};
+  final Set<String> _endHandled = {};
 
   final StreamController<IncomingCallEvent> _incomingCallController =
       StreamController<IncomingCallEvent>.broadcast();
@@ -329,6 +330,11 @@ class CallNotificationService {
           name == 'ACTION_CALL_TIMEOUT' ||
           name == 'CALL_TIMEOUT' ||
           name.contains('actionCallTimeout');
+      final isEnd =
+          name == 'ACTION_CALL_ENDED' ||
+          name == 'CALL_ENDED' ||
+          name.contains('actionCallEnded') ||
+          name.contains('actionCallEnd');
       final isIncoming =
           name == 'ACTION_CALL_INCOMING' ||
           name.contains('actionCallIncoming');
@@ -383,6 +389,32 @@ class CallNotificationService {
           _stopWatchingIncoming(callId);
           _markCallkitHandled(callId);
           CallInviteService.instance.missedCall(callId: callId);
+        }
+      }
+
+      // End from native CallKit (e.g. iOS lock screen hang-up) may bypass
+      // in-app CallSessionViewModel.endCall(). Reflect it to server so the
+      // caller side watcher can terminate immediately.
+      if (isEnd) {
+        debugPrint('$_tag END — callId=$callId');
+        if (callId.isNotEmpty) {
+          if (_endHandled.contains(callId)) {
+            debugPrint('$_tag END ignored (duplicate) — callId=$callId');
+            return;
+          }
+          _endHandled.add(callId);
+          _cancelMissedTimeout(callId);
+          _stopWatchingIncoming(callId);
+          _markCallkitHandled(callId);
+          final accepted = _acceptHandled.contains(callId);
+          if (accepted) {
+            await CallInviteService.instance.endCall(callId: callId);
+          } else {
+            await CallInviteService.instance.answerCall(
+              callId: callId,
+              action: 'decline',
+            );
+          }
         }
       }
 

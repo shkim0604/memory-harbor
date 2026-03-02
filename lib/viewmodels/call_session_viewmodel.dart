@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../config/agora_config.dart';
@@ -13,6 +14,8 @@ import '../services/call_invite_service.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import '../services/call_notification_service.dart' show CallInvitePayload;
 import '../widgets/call_status_indicator.dart';
+
+const String _tag = '[CSV]'; // CallSessionViewModel log prefix
 
 class CallSessionViewModel {
   CallSessionViewModel._();
@@ -36,6 +39,7 @@ class CallSessionViewModel {
 
   Timer? _callTimer;
   bool _isEnding = false;
+  bool _recordingStartInFlight = false;
   final AudioPlayer _connectingPlayer = AudioPlayer();
   bool _connectingToneActive = false;
   final Set<VoidCallback> _listeners = {};
@@ -202,7 +206,14 @@ class CallSessionViewModel {
         channelName: nextChannelName,
         uid: nextUid,
       );
-      nextToken = fetchedToken ?? '';
+      nextToken = (fetchedToken ?? '').trim();
+      if (nextToken.isEmpty) {
+        _notifyError('토큰 발급 실패: 네트워크/서버 상태를 확인하세요');
+        status = CallSessionState.ended;
+        _syncConnectingTone();
+        _notifyChanged();
+        return false;
+      }
     }
     currentToken = nextToken;
 
@@ -241,6 +252,9 @@ class CallSessionViewModel {
     String? groupNameSnapshot,
     String? receiverNameSnapshot,
   }) async {
+    debugPrint(
+      '$_tag startCallWithInvite: caller=$callerId receiver=$receiverId group=$groupId',
+    );
     final invite = await CallInviteService.instance.inviteCall(
       groupId: groupId,
       callerId: callerId,
@@ -250,9 +264,13 @@ class CallSessionViewModel {
       receiverNameSnapshot: receiverNameSnapshot,
     );
     if (invite == null) {
+      debugPrint('$_tag startCallWithInvite: invite failed');
       _notifyError('통화 요청 실패: 서버에 연결할 수 없습니다');
       return false;
     }
+    debugPrint(
+      '$_tag startCallWithInvite: invited callId=${invite.callId}, channel=${invite.channelName}',
+    );
     final channelName = invite.channelName.isNotEmpty
         ? invite.channelName
         : invite.callId;
@@ -275,6 +293,7 @@ class CallSessionViewModel {
     required CallInvitePayload payload,
   }) async {
     if (payload.callId.isEmpty) return false;
+    debugPrint('$_tag acceptIncoming: callId=${payload.callId}');
     final success = await CallInviteService.instance.answerCall(
       callId: payload.callId,
       action: 'accept',
@@ -302,6 +321,7 @@ class CallSessionViewModel {
     required CallInvitePayload payload,
   }) async {
     if (payload.callId.isEmpty) return false;
+    debugPrint('$_tag acceptIncomingSilent: callId=${payload.callId}');
     final success = await CallInviteService.instance.answerCall(
       callId: payload.callId,
       action: 'accept',
@@ -326,6 +346,7 @@ class CallSessionViewModel {
   /// Decline an incoming call (receiver side).
   Future<bool> declineIncoming({required String callId}) async {
     if (callId.isEmpty) return false;
+    debugPrint('$_tag declineIncoming: callId=$callId');
     return await CallInviteService.instance.answerCall(
       callId: callId,
       action: 'decline',
@@ -380,7 +401,12 @@ class CallSessionViewModel {
       final data = snapshot.data();
       if (data == null) return;
       if (_isEnding || status == CallSessionState.ended) return;
-      final serverStatus = (data['status'] ?? '') as String;
+      final serverStatus = ((data['status'] ?? '') as String)
+          .trim()
+          .toLowerCase();
+      debugPrint(
+        '$_tag watchCallStatus: callId=$callId status=$serverStatus local=$status',
+      );
 
       if (cancelStatuses.contains(serverStatus)) {
         // Remote cancellation before call connected.
@@ -471,20 +497,26 @@ class CallSessionViewModel {
 
   void _maybeStartRecording() {
     if (isRecording) return;
+    if (_recordingStartInFlight) return;
+    if (!_isLocalCaller) return;
     if (status != CallSessionState.onCall) return;
     if (remoteUsers.isEmpty) return;
     // Start server recording only when both sides are in the channel.
+    _recordingStartInFlight = true;
     unawaited(
       _startServerRecording().then((started) {
         if (started) {
           isRecording = true;
           _notifyChanged();
         }
+      }).whenComplete(() {
+        _recordingStartInFlight = false;
       }),
     );
   }
 
   Future<bool> _startServerRecording() async {
+    if (!_isLocalCaller) return false;
     final channelName = currentChannelName;
     if (channelName == null || channelName.isEmpty) {
       _notifyError('녹음 시작 실패: 채널 정보가 없습니다');
@@ -506,6 +538,7 @@ class CallSessionViewModel {
   }
 
   Future<void> _stopServerRecording() async {
+    if (!_isLocalCaller) return;
     final channelName = currentChannelName;
     if (channelName == null || channelName.isEmpty) {
       _notifyError('녹음 중지 실패: 채널 정보가 없습니다');
@@ -532,21 +565,26 @@ class CallSessionViewModel {
     _stopWatchingCallStatus();
     final previousStatus = status;
     final callIdToEnd = currentCallId;
+    debugPrint(
+      '$_tag endCall begin: callId=$callIdToEnd previous=$previousStatus notifyServer=$notifyServer',
+    );
 
     // 1. Notify server FIRST (fire-and-forget) so Firestore is updated ASAP.
     Future<void>? serverNotify;
     if (notifyServer && callIdToEnd != null && callIdToEnd.isNotEmpty) {
       if (previousStatus == CallSessionState.onCall) {
+        debugPrint('$_tag endCall notify: end callId=$callIdToEnd');
         serverNotify =
             CallInviteService.instance.endCall(callId: callIdToEnd);
       } else if (previousStatus == CallSessionState.connecting) {
+        debugPrint('$_tag endCall notify: cancel callId=$callIdToEnd');
         serverNotify =
             CallInviteService.instance.cancelCall(callId: callIdToEnd);
       }
     }
 
     // 2. Stop recording & leave Agora channel.
-    if (isRecording) {
+    if (isRecording && _isLocalCaller) {
       if (notifyServer) {
         unawaited(_stopServerRecording());
       } else {
@@ -573,8 +611,10 @@ class CallSessionViewModel {
     if (serverNotify != null) {
       try {
         await serverNotify;
+        debugPrint('$_tag endCall notify: completed callId=$callIdToEnd');
       } catch (_) {}
     }
+    debugPrint('$_tag endCall done: callId=$callIdToEnd');
     _isEnding = false;
   }
 
@@ -587,6 +627,13 @@ class CallSessionViewModel {
     _stopCallTimer();
     _syncConnectingTone();
     _notifyChanged();
+  }
+
+  bool get _isLocalCaller {
+    final localUid = FirebaseAuth.instance.currentUser?.uid;
+    final callerUid = currentCallerId;
+    if (localUid == null || callerUid == null) return false;
+    return localUid == callerUid;
   }
 
   void _notifyChanged() {

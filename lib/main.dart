@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase/firebase_config.dart';
+import 'services/call_service.dart';
 import 'services/call_notification_service.dart';
 import 'services/user_service.dart';
 import 'theme/app_theme.dart';
@@ -75,13 +76,41 @@ Future<void> main() async {
   bool receiverScreenActive = false;
   IncomingCallEvent? pendingIncoming;
 
-  void tryHandlePending() {
+  bool isSameCallAlreadyActive(String callId) {
+    if (callId.isEmpty) return false;
+    final session = CallSessionViewModel.instance;
+    final sameCall = session.currentCallId == callId;
+    final active =
+        session.status == CallSessionState.connecting ||
+        session.status == CallSessionState.onCall;
+    return sameCall && active;
+  }
+
+  Future<bool> isTerminalCall(String callId) async {
+    if (callId.isEmpty) return false;
+    try {
+      final data = await CallService.instance.getCallDoc(callId);
+      final status = ((data?['status'] ?? '') as String).trim().toLowerCase();
+      const terminal = {'missed', 'declined', 'cancelled', 'ended', 'completed'};
+      return terminal.contains(status);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> tryHandlePending() async {
     if (receiverScreenActive) return;
     if (pendingIncoming == null) return;
     if (_lifecycleLogger.lastState != AppLifecycleState.resumed) return;
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
     final event = pendingIncoming!;
+    if (await isTerminalCall(event.payload.callId)) {
+      debugPrint('$_lifeTag pending incoming dropped (terminal) callId=${event.payload.callId}');
+      pendingIncoming = null;
+      return;
+    }
+    final autoStart = event.autoStart && !isSameCallAlreadyActive(event.payload.callId);
     debugPrint('$_lifeTag pending incoming -> navigate callId=${event.payload.callId}, autoStart=${event.autoStart}');
     pendingIncoming = null;
     receiverScreenActive = true;
@@ -90,7 +119,7 @@ Future<void> main() async {
           MaterialPageRoute(
             builder: (_) => ReceiverCallScreen(
               payload: event.payload,
-              autoStart: event.autoStart,
+              autoStart: autoStart,
             ),
           ),
         )
@@ -103,12 +132,16 @@ Future<void> main() async {
   _lifecycleLogger.stateStream.listen((state) {
     if (state == AppLifecycleState.resumed) {
       debugPrint('$_lifeTag resumed -> tryHandlePending');
-      tryHandlePending();
+      unawaited(tryHandlePending());
     }
   });
 
-  CallNotificationService.instance.incomingCallStream.listen((event) {
+  CallNotificationService.instance.incomingCallStream.listen((event) async {
     debugPrint('$_lifeTag incoming call event callId=${event.payload.callId}, autoStart=${event.autoStart}');
+    if (await isTerminalCall(event.payload.callId)) {
+      debugPrint('$_lifeTag incoming call ignored (terminal) callId=${event.payload.callId}');
+      return;
+    }
     if (CallSessionViewModel.instance.status == CallSessionState.onCall) {
       debugPrint('$_lifeTag incoming call ignored: already onCall');
       return;
@@ -123,16 +156,21 @@ Future<void> main() async {
         unawaited(CallSessionViewModel.instance.acceptIncomingSilent(
           payload: event.payload,
         ));
+        pendingIncoming = IncomingCallEvent(
+          payload: event.payload,
+          autoStart: false,
+        );
       }
       return;
     }
+    final autoStart = event.autoStart && !isSameCallAlreadyActive(event.payload.callId);
     receiverScreenActive = true;
     nav
         .push(
           MaterialPageRoute(
             builder: (_) => ReceiverCallScreen(
               payload: event.payload,
-              autoStart: event.autoStart,
+              autoStart: autoStart,
             ),
           ),
         )

@@ -305,6 +305,20 @@ class AgoraService {
       );
 
       return true;
+    } on AgoraRtcException catch (e) {
+      // -17: The request is rejected because the user is already in the channel.
+      // Treat as success to avoid surfacing a false failure to the UI.
+      if (e.code == -17) {
+        debugPrint('Agora: Join channel ignored (already joined) code=${e.code}');
+        _isInChannel = true;
+        onJoinChannelSuccess?.call();
+        return true;
+      }
+      debugPrint(
+        'Agora: Join channel failed - AgoraRtcException(code=${e.code}, message=${e.message})',
+      );
+      onError?.call('채널 참가 실패: AgoraRtcException(code=${e.code})');
+      return false;
     } catch (e) {
       debugPrint('Agora: Join channel failed - $e');
       onError?.call('채널 참가 실패: $e');
