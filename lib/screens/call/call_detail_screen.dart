@@ -145,12 +145,23 @@ class _CallDetailScreenState extends State<CallDetailScreen>
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSessionGuideCard(),
-          Expanded(child: _buildPreviousCallsSection(_viewModel.previousCalls)),
-          _buildCallStatusBar(),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildSessionGuideCard(),
+                    _buildPreviousCallsSection(_viewModel.previousCalls),
+                  ],
+                ),
+              ),
+            ),
+            _buildCallStatusBar(),
+          ],
+        ),
       ),
     );
   }
@@ -276,6 +287,9 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // ============================================================
   Widget _buildCallStatusBar() {
     final isOnCall = _session.status == CallSessionState.onCall;
+    final canControlAudio =
+        _session.status == CallSessionState.connecting ||
+        _session.status == CallSessionState.onCall;
     final isEnded = _session.status == CallSessionState.ended;
     final isConnecting = _session.status == CallSessionState.connecting;
     final statusText = switch (_session.status) {
@@ -389,7 +403,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
                 _buildMiniControlButton(
                   icon: _session.isMuted ? Icons.mic_off : Icons.mic,
                   isActive: _session.isMuted,
-                  enabled: isOnCall,
+                  enabled: canControlAudio,
                   onPressed: _session.toggleMute,
                 ),
                 _buildMiniControlButton(
@@ -397,7 +411,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
                       ? Icons.volume_up
                       : Icons.volume_down,
                   isActive: _session.isSpeaker,
-                  enabled: isOnCall,
+                  enabled: canControlAudio,
                   onPressed: _session.toggleSpeaker,
                 ),
                 // 통화 종료 버튼
@@ -507,12 +521,15 @@ class _CallDetailScreenState extends State<CallDetailScreen>
   // ============================================================
   Widget _buildPreviousCallsSection(List<Call> previousCalls) {
     if (previousCalls.isEmpty) {
-      return const Center(
-        child: Text(
-          '이 주제의 이전 통화 기록이 아직 없습니다',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Center(
+          child: Text(
+            '이 주제의 이전 통화 기록이 아직 없습니다',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       );
@@ -548,7 +565,8 @@ class _CallDetailScreenState extends State<CallDetailScreen>
           ),
         ),
         // Carousel
-        Expanded(
+        SizedBox(
+          height: 320,
           child: PageView.builder(
             controller: _carouselController,
             itemCount: previousCalls.length,
@@ -559,7 +577,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
         ),
         // 페이지 인디케이터
         _buildPageIndicator(previousCalls.length),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
       ],
     );
   }

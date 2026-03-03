@@ -1,13 +1,13 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
+import '../services/review_service.dart';
 import '../services/user_service.dart';
 
 class ReviewsViewModel {
   static const int pageSize = 10;
   final List<Review> reviews = [];
-  DocumentSnapshot<Map<String, dynamic>>? _lastCallDoc;
+  String? _nextCursor;
   String? _groupId;
   bool isLoading = false;
   bool hasMore = true;
@@ -15,7 +15,7 @@ class ReviewsViewModel {
 
   Future<void> refresh() async {
     reviews.clear();
-    _lastCallDoc = null;
+    _nextCursor = null;
     hasMore = true;
     errorMessage = null;
     await loadMore();
@@ -25,12 +25,10 @@ class ReviewsViewModel {
     if (isLoading || !hasMore) return;
     isLoading = true;
     errorMessage = null;
-    debugPrint('[REVIEWS] loadMore start lastCallDoc=${_lastCallDoc?.id} hasMore=$hasMore');
+    debugPrint('[REVIEWS] loadMore start cursor=$_nextCursor hasMore=$hasMore');
 
     try {
-      if (_groupId == null) {
-        _groupId = await _resolveGroupId();
-      }
+      _groupId ??= await _resolveGroupId();
       if (_groupId == null || _groupId!.isEmpty) {
         hasMore = false;
         errorMessage = '그룹 정보를 찾을 수 없습니다';
@@ -38,56 +36,18 @@ class ReviewsViewModel {
         return;
       }
 
-      final List<Review> batchReviews = [];
+      final page = await ReviewService.instance.fetchFeed(
+        groupId: _groupId!,
+        limit: pageSize,
+        cursor: _nextCursor,
+      );
 
-      Query<Map<String, dynamic>> callQuery = FirebaseFirestore.instance
-          .collection('calls')
-          .where('groupId', isEqualTo: _groupId)
-          .where('reviewCount', isGreaterThan: 0)
-          .orderBy('reviewCount', descending: true)
-          .orderBy('createdAt', descending: true)
-          .limit(pageSize);
-
-      if (_lastCallDoc != null) {
-        callQuery = callQuery.startAfterDocument(_lastCallDoc!);
-      }
-
-      final callSnapshot = await callQuery.get();
-      final callDocs = callSnapshot.docs;
-      if (callDocs.isEmpty) {
-        hasMore = false;
-        debugPrint('[REVIEWS] loadMore empty calls');
-        return;
-      }
-
-      for (final callDoc in callDocs) {
-        final callId = callDoc.id;
-        final reviewsSnap = await callDoc.reference
-            .collection('reviews')
-            .orderBy('createdAt', descending: true)
-            .get();
-        if (reviewsSnap.docs.isEmpty) continue;
-        for (final doc in reviewsSnap.docs) {
-          final data = Map<String, dynamic>.from(doc.data());
-          data['reviewId'] = doc.id;
-          data['callId'] = data['callId'] ?? callId;
-          final mentioned = data['mentionedResidences'];
-          if (mentioned is List &&
-              mentioned.isNotEmpty &&
-              mentioned.first is String) {
-            data['mentionedResidences'] = const [];
-          }
-          batchReviews.add(Review.fromJson(data));
-        }
-      }
-
-      batchReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      reviews.addAll(batchReviews);
-      _lastCallDoc = callDocs.last;
-      hasMore = callDocs.length == pageSize;
+      reviews.addAll(page.items);
+      _nextCursor = page.nextCursor;
+      hasMore = page.hasMore;
 
       debugPrint(
-        '[REVIEWS] loadMore success calls=${callDocs.length} reviews=${batchReviews.length} hasMore=$hasMore',
+        '[REVIEWS] loadMore success reviews=${page.items.length} nextCursor=$_nextCursor hasMore=$hasMore',
       );
     } catch (e) {
       errorMessage = '리뷰를 불러올 수 없습니다';

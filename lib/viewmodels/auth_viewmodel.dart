@@ -68,9 +68,9 @@ class AuthViewModel {
       if (e.code == AuthorizationErrorCode.canceled) {
         return const AuthLoginResult();
       }
+      final message = e.message;
       return AuthLoginResult(
-        errorMessage:
-            'Apple 로그인에 실패했습니다: ${e.code.name} ${e.message ?? ''}'.trim(),
+        errorMessage: 'Apple 로그인에 실패했습니다: ${e.code.name} $message'.trim(),
       );
     } catch (e) {
       return AuthLoginResult(errorMessage: 'Apple 로그인에 실패했습니다: $e');

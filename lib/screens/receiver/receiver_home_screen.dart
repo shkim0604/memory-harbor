@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/receiver_home_viewmodel.dart';
-import '../../utils/time_utils.dart';
+import '../../utils/call_format_utils.dart';
 import 'receiver_call_history_screen.dart';
 
 class ReceiverHomeScreen extends StatefulWidget {
@@ -115,7 +115,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '공동체 멤버 ${memberCount}명',
+            '공동체 멤버 $memberCount명',
             style: TextStyle(
               fontSize: 18,
               color: AppColors.textSecondary,
@@ -127,7 +127,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
               Expanded(
                 child: _buildStatCard(
                   title: '총 통화',
-                  value: '${totalCalls}회',
+                  value: '$totalCalls회',
                   subtitle: '전체 누적',
                   accent: AppColors.secondary,
                 ),
@@ -136,7 +136,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
               Expanded(
                 child: _buildStatCard(
                   title: '이번주',
-                  value: '${thisWeek}회',
+                  value: '$thisWeek회',
                   subtitle: '최근 7일',
                   accent: AppColors.primary,
                 ),
@@ -219,7 +219,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
             itemCount: visibleCalls.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final call = visibleCalls[index];
               return _buildCallCard(call);
@@ -268,8 +268,8 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
   }
 
   Widget _buildCallCard(Call call) {
-    final dateText = _formatDate(call.startedAt);
-    final durationText = _formatDurationFromCall(call);
+    final dateText = CallFormatUtils.formatDateTimeEt(call.startedAt);
+    final durationText = CallFormatUtils.formatDurationCompact(call);
     final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
     final icon = isCompleted ? Icons.call : Icons.phone_missed;
     final iconColor = AppColors.primary;
@@ -335,33 +335,5 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final et = TimeUtils.toEt(date);
-    final year = et.year.toString();
-    final month = et.month.toString().padLeft(2, '0');
-    final day = et.day.toString().padLeft(2, '0');
-    final hour = et.hour.toString().padLeft(2, '0');
-    final minute = et.minute.toString().padLeft(2, '0');
-    return '$year.$month.$day $hour:$minute';
-  }
-
-  String _formatDurationFromCall(Call call) {
-    final seconds = _durationSeconds(call);
-    if (seconds <= 0) return '0초';
-    final minutes = seconds ~/ 60;
-    final remain = seconds % 60;
-    if (minutes <= 0) return '${seconds}초';
-    return remain == 0 ? '${minutes}분' : '${minutes}분 ${remain}초';
-  }
-
-  int _durationSeconds(Call call) {
-    final raw = call.durationSec ?? 0;
-    if (raw > 0) return raw;
-    final endedAt = call.endedAt;
-    if (endedAt == null) return 0;
-    final diff = endedAt.difference(call.startedAt).inSeconds;
-    return diff > 0 ? diff : 0;
   }
 }

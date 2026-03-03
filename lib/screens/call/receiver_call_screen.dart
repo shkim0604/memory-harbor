@@ -186,7 +186,9 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   }
 
   Widget _buildInCallControls() {
-    final isInCall = _session.status == CallSessionState.onCall;
+    final canControlAudio =
+        _session.status == CallSessionState.connecting ||
+        _session.status == CallSessionState.onCall;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -199,14 +201,14 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
                 icon: _session.isMuted ? Icons.mic_off : Icons.mic,
                 label: _session.isMuted ? '음소거 해제' : '음소거',
                 isActive: _session.isMuted,
-                enabled: isInCall,
+                enabled: canControlAudio,
                 onPressed: _session.toggleMute,
               ),
               _buildMiniButton(
                 icon: _session.isSpeaker ? Icons.volume_up : Icons.volume_down,
                 label: '스피커',
                 isActive: _session.isSpeaker,
-                enabled: isInCall,
+                enabled: canControlAudio,
                 onPressed: _session.toggleSpeaker,
               ),
             ],

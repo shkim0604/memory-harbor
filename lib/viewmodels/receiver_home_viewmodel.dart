@@ -46,7 +46,7 @@ class ReceiverHomeViewModel {
         return;
       }
 
-      _subscribeCalls(nextGroup.receiverId, onChanged);
+      _subscribeCalls(nextGroup.groupId, onChanged);
     });
   }
 
@@ -55,10 +55,10 @@ class ReceiverHomeViewModel {
     _callsSub?.cancel();
   }
 
-  void _subscribeCalls(String receiverId, void Function() onChanged) {
+  void _subscribeCalls(String groupId, void Function() onChanged) {
     _callsSub?.cancel();
     _callsSub = CallService.instance
-        .streamCallsByReceiver(receiverId)
+        .streamCallsByGroup(groupId)
         .listen((nextCalls) {
       calls = nextCalls;
       status = ReceiverHomeStatus.ready;

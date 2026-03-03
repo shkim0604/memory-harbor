@@ -709,7 +709,9 @@ class _CallScreenState extends State<CallScreen> {
   // 하단: 통화 관련 아이콘들
   // ============================================================
   Widget _buildControlSection() {
-    final isInCall = _session.status == CallSessionState.onCall;
+    final canControlAudio =
+        _session.status == CallSessionState.connecting ||
+        _session.status == CallSessionState.onCall;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
@@ -720,14 +722,14 @@ class _CallScreenState extends State<CallScreen> {
             icon: _session.isMuted ? Icons.mic_off : Icons.mic,
             label: _session.isMuted ? '음소거 해제' : '음소거',
             isActive: _session.isMuted,
-            enabled: isInCall,
+            enabled: canControlAudio,
             onPressed: _toggleMute,
           ),
           _buildControlButton(
             icon: _session.isSpeaker ? Icons.volume_up : Icons.volume_down,
             label: '스피커',
             isActive: _session.isSpeaker,
-            enabled: isInCall,
+            enabled: canControlAudio,
             onPressed: _toggleSpeaker,
           ),
           _buildEndCallButton(),

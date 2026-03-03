@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -91,6 +93,17 @@ class CallSessionViewModel {
   }
 
   String get memoDraft => _memoDraft;
+
+  /// 서버/푸시 payload에서 channel 값이 비어 있으면 callId를 fallback으로 쓴다.
+  String _resolveChannelName({
+    required String callId,
+    required String? channelName,
+  }) {
+    if (channelName != null && channelName.isNotEmpty) {
+      return channelName;
+    }
+    return callId;
+  }
 
   Future<bool> startCall(
     BuildContext context, {
@@ -283,9 +296,10 @@ class CallSessionViewModel {
     debugPrint(
       '$_tag startCallWithInvite: invited callId=${invite.callId}, channel=${invite.channelName}',
     );
-    final channelName = invite.channelName.isNotEmpty
-        ? invite.channelName
-        : invite.callId;
+    final channelName = _resolveChannelName(
+      callId: invite.callId,
+      channelName: invite.channelName,
+    );
     watchCallStatus(invite.callId);
     final started = await startCall(
       context,
@@ -314,9 +328,10 @@ class CallSessionViewModel {
       _notifyError('수락 실패: 서버에 연결할 수 없습니다');
       return false;
     }
-    final channelName = payload.channelName.isNotEmpty
-        ? payload.channelName
-        : payload.callId;
+    final channelName = _resolveChannelName(
+      callId: payload.callId,
+      channelName: payload.channelName,
+    );
     final started = await startCall(
       context,
       groupId: payload.groupId,
@@ -342,9 +357,10 @@ class CallSessionViewModel {
       _notifyError('수락 실패: 서버에 연결할 수 없습니다');
       return false;
     }
-    final channelName = payload.channelName.isNotEmpty
-        ? payload.channelName
-        : payload.callId;
+    final channelName = _resolveChannelName(
+      callId: payload.callId,
+      channelName: payload.channelName,
+    );
     final started = await startCallSilent(
       groupId: payload.groupId,
       channelName: channelName,
@@ -369,15 +385,18 @@ class CallSessionViewModel {
   /// Firestore watcher picks up the status change immediately.
   Future<void> endCall() => _doEndCall(notifyServer: true);
 
+  bool get _canControlAudio =>
+      status == CallSessionState.connecting || status == CallSessionState.onCall;
+
   Future<void> toggleMute() async {
-    if (status != CallSessionState.onCall) return;
+    if (!_canControlAudio) return;
     isMuted = !isMuted;
     await AgoraService.instance.setMuted(isMuted);
     _notifyChanged();
   }
 
   Future<void> toggleSpeaker() async {
-    if (status != CallSessionState.onCall) return;
+    if (!_canControlAudio) return;
     isSpeaker = !isSpeaker;
     await AgoraService.instance.setSpeakerOn(isSpeaker);
     _notifyChanged();

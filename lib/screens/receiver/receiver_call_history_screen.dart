@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../theme/app_colors.dart';
-import '../../utils/time_utils.dart';
+import '../../utils/call_format_utils.dart';
 
 class ReceiverCallHistoryScreen extends StatelessWidget {
   final List<Call> calls;
@@ -21,7 +21,7 @@ class ReceiverCallHistoryScreen extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         itemCount: calls.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final call = calls[index];
           return _ReceiverCallHistoryCard(call: call);
@@ -38,8 +38,8 @@ class _ReceiverCallHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateText = _formatDate(call.startedAt);
-    final durationText = _formatDurationFromCall(call);
+    final dateText = CallFormatUtils.formatDateTimeEt(call.startedAt);
+    final durationText = CallFormatUtils.formatDurationCompact(call);
     final name =
         call.giverNameSnapshot.isNotEmpty ? call.giverNameSnapshot : '통화 상대';
     final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
@@ -105,33 +105,5 @@ class _ReceiverCallHistoryCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final et = TimeUtils.toEt(date);
-    final year = et.year.toString();
-    final month = et.month.toString().padLeft(2, '0');
-    final day = et.day.toString().padLeft(2, '0');
-    final hour = et.hour.toString().padLeft(2, '0');
-    final minute = et.minute.toString().padLeft(2, '0');
-    return '$year.$month.$day $hour:$minute';
-  }
-
-  String _formatDurationFromCall(Call call) {
-    final seconds = _durationSeconds(call);
-    if (seconds <= 0) return '0초';
-    final minutes = seconds ~/ 60;
-    final remain = seconds % 60;
-    if (minutes <= 0) return '${seconds}초';
-    return remain == 0 ? '${minutes}분' : '${minutes}분 ${remain}초';
-  }
-
-  int _durationSeconds(Call call) {
-    final raw = call.durationSec ?? 0;
-    if (raw > 0) return raw;
-    final endedAt = call.endedAt;
-    if (endedAt == null) return 0;
-    final diff = endedAt.difference(call.startedAt).inSeconds;
-    return diff > 0 ? diff : 0;
   }
 }

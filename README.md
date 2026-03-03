@@ -2,7 +2,7 @@
 
 Flutter client for the MemHarbor app (memory + caregiving).
 
-Last updated (ET): 2026-02-04
+Last updated (ET): 2026-03-02
 
 ## Project Structure
 
@@ -12,6 +12,7 @@ lib/
     agora_config.dart      # Agora appId + API base URL
   utils/
     time_utils.dart        # Timezone helpers (America/New_York)
+    call_format_utils.dart # Call date/duration UI formatting helpers
   firebase/
     firebase_config.dart        # Env + emulator routing for Firebase
     firebase_options_dev.dart   # Dev Firebase options (generated)
@@ -28,6 +29,7 @@ lib/
     storage_service.dart    # Storage upload/download
     agora_service.dart      # Agora RTC + server recording bridge
     call_notification_service.dart # FCM + CallKit incoming call handling
+    review_service.dart    # Reviews API client
   viewmodels/
     auth_viewmodel.dart         # Auth state + actions
     call_detail_viewmodel.dart  # Call detail screen state
@@ -76,6 +78,26 @@ This project follows a lightweight MVVM structure:
 1. UI should not directly access Firestore/Auth. Use a ViewModel.
 2. ViewModels expose plain fields + methods and notify the view via `setState`.
 3. Services are stateless singletons; keep network/storage details there.
+
+## Refactoring Notes (2026-03-02)
+
+- 콜 세션 로직(`CallSessionViewModel`, `AgoraService`, `CallInviteService`)은 **동작 변경 없이** 가독성 중심으로만 정리했습니다.
+- 화면 계층에서 반복되던 통화 시간/날짜 포맷 로직을 `CallFormatUtils`로 추출해 중복을 줄였습니다.
+- 리시버/홈 화면의 텍스트 포맷 및 일부 린트 이슈를 정리해 유지보수성을 개선했습니다.
+- 앱 루트(`main.dart`)에서 최소 텍스트 스케일(1.08)을 보장해 중장년층 대상 가독성을 높였습니다.
+
+## Firestore Direct Access vs Server API (검토안)
+
+현재 클라이언트 일부 ViewModel은 Firestore를 직접 조회합니다. 빠른 개발에는 유리하지만, 아래 상황에서는 서버 API로 옮기는 편이 좋습니다.
+
+- 권한 정책/감사 로그/비즈니스 룰을 서버에서 강제해야 할 때
+- 복잡한 조인/집계/정렬이 늘어나 쿼리 유지비가 커질 때
+- 앱 업데이트 없이 응답 스키마를 점진적으로 바꾸고 싶을 때
+
+권장 단계:
+1. 조회량이 큰 화면(리뷰/히스토리)부터 읽기 API를 서버로 이관
+2. 앱은 Service 레이어를 통해 API/Firestore를 교체 가능하게 유지
+3. 안정화 후 Firestore rules를 최소 권한 기준으로 재정비
 
 ## Call + Recording
 
@@ -209,3 +231,8 @@ This project requires **JDK 17** for Android builds. Ensure Gradle uses JDK 17:
 
 - The domain models in `lib/models/` are plain Dart models, designed to be
   firestore-friendly (json serialization + snapshots).
+
+## Operational Docs
+
+- `docs/device-accessibility-qa-checklist.md`
+- `docs/firestore-to-server-migration-plan.md`

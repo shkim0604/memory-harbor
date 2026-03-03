@@ -64,6 +64,38 @@ class ApiClient {
     }
   }
 
+  /// GET JSON from [url] and return the decoded response body.
+  ///
+  /// Automatically attaches `Authorization: Bearer <idToken>` when
+  /// a Firebase user is signed in.
+  ///
+  /// Returns `null` if the request fails or the server returns a non-2xx status.
+  Future<Map<String, dynamic>?> getJson(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final idToken = await _getIdToken();
+      final client = HttpClient();
+      final request = await client.getUrl(uri);
+      request.headers.contentType = ContentType.json;
+      if (idToken != null && idToken.isNotEmpty) {
+        request.headers.set('Authorization', 'Bearer $idToken');
+      }
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+      client.close();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+      if (responseBody.trim().isEmpty) return <String, dynamic>{};
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return <String, dynamic>{'data': decoded};
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// POST [body] as JSON to [url] and return `true` if the server responds
   /// with 2xx.
   Future<bool> postJsonOk(String url, Map<String, dynamic> body) async {

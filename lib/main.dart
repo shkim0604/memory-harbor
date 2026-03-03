@@ -91,7 +91,13 @@ Future<void> main() async {
     try {
       final data = await CallService.instance.getCallDoc(callId);
       final status = ((data?['status'] ?? '') as String).trim().toLowerCase();
-      const terminal = {'missed', 'declined', 'cancelled', 'ended', 'completed'};
+      const terminal = {
+        'missed',
+        'declined',
+        'cancelled',
+        'ended',
+        'completed',
+      };
       return terminal.contains(status);
     } catch (_) {
       return false;
@@ -106,12 +112,17 @@ Future<void> main() async {
     if (nav == null) return;
     final event = pendingIncoming!;
     if (await isTerminalCall(event.payload.callId)) {
-      debugPrint('$_lifeTag pending incoming dropped (terminal) callId=${event.payload.callId}');
+      debugPrint(
+        '$_lifeTag pending incoming dropped (terminal) callId=${event.payload.callId}',
+      );
       pendingIncoming = null;
       return;
     }
-    final autoStart = event.autoStart && !isSameCallAlreadyActive(event.payload.callId);
-    debugPrint('$_lifeTag pending incoming -> navigate callId=${event.payload.callId}, autoStart=${event.autoStart}');
+    final autoStart =
+        event.autoStart && !isSameCallAlreadyActive(event.payload.callId);
+    debugPrint(
+      '$_lifeTag pending incoming -> navigate callId=${event.payload.callId}, autoStart=${event.autoStart}',
+    );
     pendingIncoming = null;
     receiverScreenActive = true;
     nav
@@ -137,9 +148,13 @@ Future<void> main() async {
   });
 
   CallNotificationService.instance.incomingCallStream.listen((event) async {
-    debugPrint('$_lifeTag incoming call event callId=${event.payload.callId}, autoStart=${event.autoStart}');
+    debugPrint(
+      '$_lifeTag incoming call event callId=${event.payload.callId}, autoStart=${event.autoStart}',
+    );
     if (await isTerminalCall(event.payload.callId)) {
-      debugPrint('$_lifeTag incoming call ignored (terminal) callId=${event.payload.callId}');
+      debugPrint(
+        '$_lifeTag incoming call ignored (terminal) callId=${event.payload.callId}',
+      );
       return;
     }
     if (CallSessionViewModel.instance.status == CallSessionState.onCall) {
@@ -148,14 +163,19 @@ Future<void> main() async {
     }
     if (receiverScreenActive) return;
     final nav = appNavigatorKey.currentState;
-    if (nav == null || _lifecycleLogger.lastState != AppLifecycleState.resumed) {
-      debugPrint('$_lifeTag incoming call deferred (nav=${nav != null}, state=${_lifecycleLogger.lastState})');
+    if (nav == null ||
+        _lifecycleLogger.lastState != AppLifecycleState.resumed) {
+      debugPrint(
+        '$_lifeTag incoming call deferred (nav=${nav != null}, state=${_lifecycleLogger.lastState})',
+      );
       pendingIncoming = event;
       if (event.autoStart) {
         debugPrint('$_lifeTag autoStart in background -> accept call silently');
-        unawaited(CallSessionViewModel.instance.acceptIncomingSilent(
-          payload: event.payload,
-        ));
+        unawaited(
+          CallSessionViewModel.instance.acceptIncomingSilent(
+            payload: event.payload,
+          ),
+        );
         pendingIncoming = IncomingCallEvent(
           payload: event.payload,
           autoStart: false,
@@ -163,7 +183,8 @@ Future<void> main() async {
       }
       return;
     }
-    final autoStart = event.autoStart && !isSameCallAlreadyActive(event.payload.callId);
+    final autoStart =
+        event.autoStart && !isSameCallAlreadyActive(event.payload.callId);
     receiverScreenActive = true;
     nav
         .push(
@@ -186,6 +207,9 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // 중장년층 가독성을 위해 최소 텍스트 스케일을 1.15로 보장한다.
+  static const double _minReadableTextScale = 1.15;
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -193,6 +217,17 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       navigatorKey: appNavigatorKey,
       theme: AppTheme.lightTheme,
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        final baseScale = mediaQuery.textScaler.scale(1.0);
+        final textScaler = baseScale < _minReadableTextScale
+            ? TextScaler.linear(_minReadableTextScale)
+            : mediaQuery.textScaler;
+        return MediaQuery(
+          data: mediaQuery.copyWith(textScaler: textScaler),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const SplashScreen(),
       routes: {
         '/auth': (context) => const AuthScreen(),

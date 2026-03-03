@@ -273,7 +273,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
 
   Widget _buildCallHistorySection({required double screenHeight}) {
     final calls = _viewModel.filteredCalls;
-    final cardHeight = (screenHeight * 0.15).clamp(100.0, 136.0);
+    final cardHeight = (screenHeight * 0.17).clamp(112.0, 156.0);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -325,7 +325,6 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     return GestureDetector(
       onTap: () => _showSummaryPopupForCall(call),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -343,15 +342,20 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      Text(
-                        call.giverNameSnapshot,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Text(
+                          call.giverNameSnapshot,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -371,6 +375,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   _formatDate(call.startedAt),

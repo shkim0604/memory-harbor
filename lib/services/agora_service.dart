@@ -1,3 +1,5 @@
+// ignore_for_file: use_null_aware_elements
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -341,10 +343,10 @@ class AgoraService {
     final body = <String, dynamic>{
       'channel': channelName,
       'uid': uid,
-      if (userAccount != null && userAccount.isNotEmpty)
-        'user_account': userAccount,
+      if (userAccount case final account? when account.isNotEmpty)
+        'user_account': account,
       'role': role,
-      if (expireSeconds != null) 'expire': expireSeconds,
+      if (expireSeconds case final expire?) 'expire': expire,
     };
 
     debugPrint('=== fetchToken START === $url');

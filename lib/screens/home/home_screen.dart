@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_colors.dart';
 import '../../models/models.dart';
+import '../../utils/call_format_utils.dart';
 import '../../viewmodels/home_viewmodel.dart';
 import '../../widgets/widgets.dart';
-import '../../utils/time_utils.dart';
 import '../reviews/review_write_screen.dart';
 
 // Firebase 에서 불러오는 데이터
@@ -492,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatDateTime(call.startedAt),
+                      CallFormatUtils.formatDateTimeEt(call.startedAt),
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -502,7 +502,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Text(
-                _formatDurationFromCall(call),
+                CallFormatUtils.formatDurationHumanized(call),
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
             ],
@@ -612,9 +612,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCommunityCallCard(Call call) {
-    final summary = call.humanSummary.isNotEmpty
-        ? call.humanSummary
-        : call.humanNotes;
     final isCompleted = call.endedAt != null && (call.durationSec ?? 0) > 0;
     final icon = isCompleted ? Icons.call : Icons.phone_missed;
     return Container(
@@ -672,7 +669,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        _formatDurationFromCall(call),
+                        CallFormatUtils.formatDurationHumanized(call),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -693,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        _formatDateTime(call.startedAt),
+                        CallFormatUtils.formatDateTimeEt(call.startedAt),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -706,7 +703,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 // const SizedBox(height: 10),
                 // Text(
-                //   summary,
+                //   call.humanSummary.isNotEmpty ? call.humanSummary : call.humanNotes,
                 //   style: const TextStyle(
                 //     fontSize: 14,
                 //     color: AppColors.textSecondary,
@@ -721,41 +718,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    final et = TimeUtils.toEt(dateTime);
-    final date =
-        '${et.year}.${et.month.toString().padLeft(2, '0')}.${et.day.toString().padLeft(2, '0')}';
-    final time =
-        '${et.hour.toString().padLeft(2, '0')}:${et.minute.toString().padLeft(2, '0')}';
-    return '$date  $time';
-  }
-
-  String _formatDurationFromCall(Call call) {
-    final seconds = _durationSeconds(call);
-    if (seconds <= 0) return '0초';
-    final duration = Duration(seconds: seconds);
-    final totalMinutes = duration.inMinutes;
-    if (totalMinutes < 60) {
-      if (totalMinutes <= 0) return '${seconds}초';
-      return '${totalMinutes}분';
-    }
-    final hours = duration.inHours;
-    final minutes = totalMinutes % 60;
-    if (minutes == 0) {
-      return '${hours}시간';
-    }
-    return '${hours}시간 ${minutes}분';
-  }
-
-  int _durationSeconds(Call call) {
-    final raw = call.durationSec ?? 0;
-    if (raw > 0) return raw;
-    final endedAt = call.endedAt;
-    if (endedAt == null) return 0;
-    final diff = endedAt.difference(call.startedAt).inSeconds;
-    return diff > 0 ? diff : 0;
   }
 
   Widget _buildEmptyListMessage(String message) {
