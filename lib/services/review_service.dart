@@ -84,15 +84,21 @@ class ExistingMyReviewData {
   });
 }
 
+class ReviewUiConfig {
+  final String? restrictedQuestionsVisibleDateEt; // yyyy-MM-dd (ET)
+
+  const ReviewUiConfig({this.restrictedQuestionsVisibleDateEt});
+}
+
 class ReviewUpsertRequest {
   final String callId;
   final String? existingMyReviewDocId;
-  final int listeningScore;
-  final String notFullyHeardMoment;
-  final String nextSessionTry;
-  final String emotionWord;
-  final String emotionSource;
-  final String smallReset;
+  final int? listeningScore;
+  final String? notFullyHeardMoment;
+  final String? nextSessionTry;
+  final String? emotionWord;
+  final String? emotionSource;
+  final String? smallReset;
   final String callMemo;
   final String? selectedTopicType;
   final String? selectedTopicId;
@@ -106,16 +112,16 @@ class ReviewUpsertRequest {
 
   const ReviewUpsertRequest({
     required this.callId,
-    required this.listeningScore,
-    required this.notFullyHeardMoment,
-    required this.nextSessionTry,
-    required this.emotionWord,
-    required this.emotionSource,
-    required this.smallReset,
     required this.callMemo,
     required this.mentionedResidences,
     required this.requiredStepOpenedAt,
     required this.requiredDurationSec,
+    this.listeningScore,
+    this.notFullyHeardMoment,
+    this.nextSessionTry,
+    this.emotionWord,
+    this.emotionSource,
+    this.smallReset,
     this.existingMyReviewDocId,
     this.selectedTopicType,
     this.selectedTopicId,
@@ -254,6 +260,23 @@ class ReviewService {
     }
   }
 
+  Future<ReviewUiConfig?> fetchUiConfig() async {
+    if (_baseUrl.isEmpty) return null;
+    try {
+      final json = await ApiClient.instance.getJson('$_baseUrl/api/reviews/config');
+      if (json == null) return null;
+      final date = _nullableString(
+        json['restrictedQuestionsVisibleDateEt'] ??
+            json['restricted_questions_visible_date_et'] ??
+            json['restrictedDateEt'],
+      );
+      return ReviewUiConfig(restrictedQuestionsVisibleDateEt: date);
+    } catch (e) {
+      debugPrint('$_tag fetchUiConfig api failed: $e');
+      return null;
+    }
+  }
+
   Future<bool> upsertReview(ReviewUpsertRequest request) async {
     if (_baseUrl.isEmpty) return false;
     final json = await ApiClient.instance.postJson(
@@ -262,12 +285,16 @@ class ReviewService {
         'callId': request.callId,
         if (request.existingMyReviewDocId != null)
           'existingReviewId': request.existingMyReviewDocId,
-        'listeningScore': request.listeningScore,
-        'notFullyHeardMoment': request.notFullyHeardMoment,
-        'nextSessionTry': request.nextSessionTry,
-        'emotionWord': request.emotionWord,
-        'emotionSource': request.emotionSource,
-        'smallReset': request.smallReset,
+        if (request.listeningScore != null)
+          'listeningScore': request.listeningScore,
+        if (request.notFullyHeardMoment != null)
+          'notFullyHeardMoment': request.notFullyHeardMoment,
+        if (request.nextSessionTry != null)
+          'nextSessionTry': request.nextSessionTry,
+        if (request.emotionWord != null) 'emotionWord': request.emotionWord,
+        if (request.emotionSource != null)
+          'emotionSource': request.emotionSource,
+        if (request.smallReset != null) 'smallReset': request.smallReset,
         'callMemo': request.callMemo,
         'selectedTopicType': request.selectedTopicType,
         'selectedTopicId': request.selectedTopicId,

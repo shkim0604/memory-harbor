@@ -289,8 +289,7 @@ class _SplashScreenState extends State<SplashScreen>
           nextScreen = const AuthScreen();
         } else {
           // Logged in - check if user exists in Firestore.
-          // On misconfigured emulator host (common on physical devices),
-          // this call may hang or throw. Don't block the app on splash.
+          // Don't block the app on splash if this call hangs or throws.
           final userExists = await UserService.instance
               .userExists(user.uid)
               .timeout(const Duration(seconds: 4));

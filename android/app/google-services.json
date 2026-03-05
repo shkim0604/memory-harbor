@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "498442703852-6o1uf810ublp0faebj84drrsbd43b2an.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.delighthouse.memory_harbor",
+            "certificate_hash": "2f9563b20544763a20c9c373ccfc65d41a4fbb54"
+          }
+        },
+        {
+          "client_id": "498442703852-edrglv0ej70bcrt5pllus3tp87fs6a7c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "org.delighthouse.memory_harbor",
+            "certificate_hash": "a963ebc0fac4d6a2231e6d36b887c31a6b9dca4c"
+          }
+        },
+        {
           "client_id": "498442703852-j37la6f6639hsj2slnbhu9la5eo3q1k5.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

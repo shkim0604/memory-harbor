@@ -49,3 +49,8 @@ firepit-log.txt
 # Local build outputs
 android/build/
 lib/firebase/build/
+
+# Android release signing (local/CI secrets)
+android/key.properties
+android/*.jks
+android/*.keystore

@@ -37,15 +37,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoadsInLocalNetwork</key>
-		<true/>
-	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>프로필 사진 촬영을 위해 카메라 권한이 필요합니다.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>개발 중 Firebase 에뮬레이터(로컬 서버)에 연결하기 위해 로컬 네트워크 접근이 필요합니다.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>음성 통화를 위해 마이크 권한이 필요합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -14,10 +14,9 @@ lib/
     time_utils.dart        # Timezone helpers (America/New_York)
     call_format_utils.dart # Call date/duration UI formatting helpers
   firebase/
-    firebase_config.dart        # Env + emulator routing for Firebase
+    firebase_config.dart        # Env-based Firebase options routing
     firebase_options_dev.dart   # Dev Firebase options (generated)
     firebase_options_prod.dart  # Prod Firebase options (generated)
-    seed.py                     # Emulator seed script
   firebase_options.dart         # Default FlutterFire output (unused)
   services/
     auth_service.dart       # Google/Apple auth wrappers
@@ -143,20 +142,18 @@ Receiver UI includes:
 All time display and generated timestamps are normalized to **America/New_York (ET, DST-aware)** via `TimeUtils`.
 If you change this policy, update `lib/utils/time_utils.dart` and the call sites.
 
-## Firebase Setup (Dev + Emulator)
+## Firebase Setup (Dev + Prod)
 
-This app uses environment flags to choose Firebase options and emulator routing.
+This app uses environment flags to choose Firebase options.
 
 ### Env Flags
 
-- `ENV=dev|emul|prod` (default: `dev`)
-- `USE_EMULATOR=true|false` (default: `false`)
+- `ENV=dev|prod` (default: `dev`)
 
 ### Initialize (already wired)
 
 `lib/main.dart` calls `FirebaseConfig.initialize()` which:
 1) selects the correct Firebase options file
-2) routes to local emulators when `ENV=emul`
 
 ### Generate Firebase options
 
@@ -178,7 +175,6 @@ You can remove it or keep it, but it should not be referenced by app code.
 ### Current Routing Rules
 
 - `ENV=dev` uses **real Firebase** with `firebase_options_prod.dart`
-- `ENV=emul` uses **emulator** with `firebase_options_dev.dart`
 - `ENV=prod` is reserved for a future dedicated prod project
 
 ### Run
@@ -188,39 +184,10 @@ Dev (real Firebase):
 flutter run --dart-define=ENV=dev
 ```
 
-Emulator (iOS Simulator / desktop / web):
+Prod:
 ```
-flutter run --dart-define=ENV=emul
+flutter run --dart-define=ENV=prod
 ```
-
-Emulator (Android Emulator):
-```
-flutter run --dart-define=ENV=emul
-```
-Notes:
-- Android emulator routes to your Mac's `localhost` via `10.0.2.2` automatically.
-
-Emulator (physical device: iPhone / real Android):
-```
-flutter run --dart-define=ENV=emul --dart-define=EMULATOR_HOST=<your-mac-ip>
-```
-Notes:
-- Replace `<your-mac-ip>` with your Mac LAN IP, e.g. `ipconfig getifaddr en0`.
-- Ensure the phone and Mac are on the same network (Wi‑Fi), and VPN is off.
-- iOS will prompt for Local Network permission on first run (required for emulator access).
-
-### Seed Firestore Emulator (Python)
-
-You can seed the Firestore emulator without running the app:
-
-```
-cd lib/firebase
-python seed.py
-```
-
-Notes:
-- Firestore emulator must be running on `localhost:8081`.
-- This script uses anonymous credentials for the emulator only.
 
 ## Android Notes
 
@@ -236,3 +203,4 @@ This project requires **JDK 17** for Android builds. Ensure Gradle uses JDK 17:
 
 - `docs/device-accessibility-qa-checklist.md`
 - `docs/firestore-to-server-migration-plan.md`
+- `docs/playstore-release-checklist.md`

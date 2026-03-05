@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/review_service.dart';
 import '../../theme/app_colors.dart';
 import '../../services/local_call_memo_service.dart';
+import '../../utils/time_utils.dart';
 
 class ReviewWriteScreen extends StatefulWidget {
   final VoidCallback? onDone;
@@ -57,6 +58,17 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
   final DateTime _requiredStepOpenedAt = DateTime.now();
   int? _requiredDurationSec;
   bool _isOptionalStep = false;
+  String? _restrictedQuestionsVisibleDateEtFromServer;
+
+  bool get _showRestrictedQuestions {
+    final visibleDateEt = _restrictedQuestionsVisibleDateEtFromServer;
+    if (visibleDateEt == null || visibleDateEt.isEmpty) return false;
+    final nowEt = TimeUtils.nowEt();
+    final yyyy = nowEt.year.toString().padLeft(4, '0');
+    final mm = nowEt.month.toString().padLeft(2, '0');
+    final dd = nowEt.day.toString().padLeft(2, '0');
+    return '$yyyy-$mm-$dd' == visibleDateEt;
+  }
 
   @override
   void initState() {
@@ -83,6 +95,9 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     });
 
     try {
+      final uiConfig = await ReviewService.instance.fetchUiConfig();
+      _restrictedQuestionsVisibleDateEtFromServer =
+          uiConfig?.restrictedQuestionsVisibleDateEt;
       await _loadCallContext(callId);
       await _loadExistingMyReview(callId);
     } finally {
@@ -232,6 +247,15 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     final callMemo = _callMemoController.text.trim();
     final selectedTopicValue = _selectedTopicValue?.trim();
     final listeningScore = _listeningScore;
+    final effectiveListeningScore =
+        _showRestrictedQuestions ? (listeningScore ?? 1) : 1;
+    final effectiveNotFullyHeardMoment =
+        _showRestrictedQuestions ? notFullyHeardMoment : '';
+    final effectiveNextSessionTry = _showRestrictedQuestions ? nextSessionTry : '';
+    final effectiveEmotionWord = _showRestrictedQuestions ? emotionWord : '';
+    final effectiveEmotionSource = _showRestrictedQuestions ? emotionSource : '내 것';
+    final effectiveSmallReset =
+        _showRestrictedQuestions ? _smallResetController.text.trim() : '';
 
     setState(() {
       _isSubmitting = true;
@@ -261,12 +285,12 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         ReviewUpsertRequest(
           callId: callId,
           existingMyReviewDocId: _existingMyReviewDocId,
-          listeningScore: listeningScore!,
-          notFullyHeardMoment: notFullyHeardMoment,
-          nextSessionTry: nextSessionTry,
-          emotionWord: emotionWord,
-          emotionSource: emotionSource,
-          smallReset: _smallResetController.text.trim(),
+          listeningScore: effectiveListeningScore,
+          notFullyHeardMoment: effectiveNotFullyHeardMoment,
+          nextSessionTry: effectiveNextSessionTry,
+          emotionWord: effectiveEmotionWord,
+          emotionSource: effectiveEmotionSource,
+          smallReset: effectiveSmallReset,
           callMemo: callMemo,
           selectedTopicType: selectedTopic?.topicType,
           selectedTopicId: selectedTopic?.topicId,
@@ -317,6 +341,9 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('1. 대화주제를 선택해주세요')));
       return false;
+    }
+    if (!_showRestrictedQuestions) {
+      return true;
     }
     if (listeningScore == null) {
       ScaffoldMessenger.of(
@@ -380,6 +407,36 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
   }
 
   List<Widget> _buildRequiredStepChildren() {
+    if (!_showRestrictedQuestions) {
+      return [
+        _buildStepHeader('1/2 단계 · 필수 질문'),
+        const SizedBox(height: 16),
+        _buildSectionTitle('1. 대화주제 선택 (시대/의미)'),
+        const SizedBox(height: 8),
+        _buildTopicDropdown(),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: (_isSubmitting || _isLoadingExisting)
+                ? null
+                : _goToOptionalStep,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              _isLoadingExisting ? '불러오는 중...' : '선택 질문으로 이동',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ];
+    }
+
     return [
       _buildStepHeader('1/2 단계 · 필수 질문'),
       const SizedBox(height: 16),
@@ -451,22 +508,24 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     return [
       _buildStepHeader('2/2 단계 · 선택 질문'),
       const SizedBox(height: 16),
-      _buildSubQuestionBlock(
-        title: '5-2. (선택) 이 감정을 오래 끌고 가지 않기 위해, 내가 할 작은 행동 1개는?',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildOptionalLabel(),
-            const SizedBox(height: 8),
-            _buildTextField(
-              controller: _smallResetController,
-              hint: '예: 5분 산책, 물 한 잔 마시기',
-              maxLines: 2,
-            ),
-          ],
+      if (_showRestrictedQuestions) ...[
+        _buildSubQuestionBlock(
+          title: '5-2. (선택) 이 감정을 오래 끌고 가지 않기 위해, 내가 할 작은 행동 1개는?',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildOptionalLabel(),
+              const SizedBox(height: 8),
+              _buildTextField(
+                controller: _smallResetController,
+                hint: '예: 5분 산책, 물 한 잔 마시기',
+                maxLines: 2,
+              ),
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 22),
+        const SizedBox(height: 22),
+      ],
       _buildSectionTitle('6. (선택) 통화 메모'),
       const SizedBox(height: 8),
       _buildOptionalLabel(description: '통화 요약이나 주요 대화 내용을 메모해 주세요.'),
