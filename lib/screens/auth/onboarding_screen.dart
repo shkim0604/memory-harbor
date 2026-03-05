@@ -268,6 +268,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Center(child: CircularProgressIndicator()),
                     )
+                  else if (_viewModel.groupsError != null)
+                    Text(
+                      _viewModel.groupsError!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.red.shade400,
+                      ),
+                    )
                   else if (_viewModel.groups.isEmpty)
                     Text(
                       '참여 가능한 그룹이 없습니다',

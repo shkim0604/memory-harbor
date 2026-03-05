@@ -288,14 +288,15 @@ class _SplashScreenState extends State<SplashScreen>
         if (user == null) {
           nextScreen = const AuthScreen();
         } else {
-          // Logged in - check if user exists in Firestore.
-          // Don't block the app on splash if this call hangs or throws.
-          final userExists = await UserService.instance
-              .userExists(user.uid)
+          final onboarded = await UserService.instance
+              .isUserOnboarded(user.uid)
               .timeout(const Duration(seconds: 4));
-          nextScreen = userExists
-              ? const MainNavigation()
-              : const OnboardingScreen();
+          if (onboarded) {
+            nextScreen = const MainNavigation();
+          } else {
+            await FirebaseAuth.instance.signOut();
+            nextScreen = const AuthScreen();
+          }
         }
       } catch (e, st) {
         debugPrint('Splash navigation check failed: $e');

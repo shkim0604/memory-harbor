@@ -87,10 +87,22 @@ class CallNotificationService {
     );
   }
 
+  Future<void> registerTokens() => _registerTokens();
+
   Future<void> _registerTokens() async {
     final uid = UserService.instance.currentUid();
     if (uid == null) {
       debugPrint('$_tag _registerTokens: uid is null — skipping');
+      return;
+    }
+    try {
+      final onboarded = await UserService.instance.isUserOnboarded(uid);
+      if (!onboarded) {
+        debugPrint('$_tag _registerTokens: user not onboarded yet — skipping');
+        return;
+      }
+    } catch (e) {
+      debugPrint('$_tag _registerTokens: onboarding check failed — $e');
       return;
     }
     final platform = Platform.isIOS

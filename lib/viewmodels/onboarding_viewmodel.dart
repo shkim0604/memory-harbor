@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../services/permission_service.dart';
 import '../services/storage_service.dart';
+import '../services/call_notification_service.dart';
 import '../services/user_service.dart';
 import '../services/group_service.dart';
 import '../models/group.dart';
@@ -43,12 +44,18 @@ class OnboardingViewModel {
     _onChanged?.call();
   }
 
+  String? groupsError;
+
   Future<void> _loadGroups() async {
     if (groupsLoading) return;
     groupsLoading = true;
+    groupsError = null;
     _onChanged?.call();
     try {
       groups = await GroupService.instance.listGroups();
+    } catch (e) {
+      debugPrint('Failed to load groups: $e');
+      groupsError = '그룹 목록을 불러오지 못했습니다: $e';
     } finally {
       groupsLoading = false;
       _onChanged?.call();
@@ -135,6 +142,9 @@ class OnboardingViewModel {
         introMessage: introMessage,
         groupIds: selectedGroupIds.toList(),
       );
+
+      // User doc now exists — register push tokens that were deferred during sign-in.
+      CallNotificationService.instance.registerTokens();
 
       return null;
     } catch (e) {

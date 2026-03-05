@@ -37,6 +37,22 @@ class UserService {
     return false;
   }
 
+  /// Check if the user has completed onboarding by reading Firestore directly.
+  /// Unlike [userExists], this avoids backend API calls that may create
+  /// the user document as a side effect.
+  Future<bool> isUserOnboarded(String uid) async {
+    try {
+      final doc = await _usersCollection.doc(uid).get();
+      if (!doc.exists) return false;
+      final data = doc.data();
+      if (data == null) return false;
+      final groupIds = data['groupIds'];
+      return groupIds is List && groupIds.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ============================================================================
   // Get user by UID
   // ============================================================================

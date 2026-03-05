@@ -35,10 +35,10 @@ class AuthViewModel {
         return const AuthLoginResult(errorMessage: '로그인에 실패했습니다.');
       }
 
-      final userExists =
-          await UserService.instance.userExists(userCredential.user!.uid);
+      final onboarded =
+          await UserService.instance.isUserOnboarded(userCredential.user!.uid);
       return AuthLoginResult(
-        nextStep: userExists ? AuthNextStep.main : AuthNextStep.onboarding,
+        nextStep: onboarded ? AuthNextStep.main : AuthNextStep.onboarding,
       );
     } catch (e) {
       return AuthLoginResult(errorMessage: 'Google 로그인에 실패했습니다: $e');
@@ -59,10 +59,10 @@ class AuthViewModel {
         return const AuthLoginResult(errorMessage: '로그인에 실패했습니다.');
       }
 
-      final userExists =
-          await UserService.instance.userExists(userCredential.user!.uid);
+      final onboarded =
+          await UserService.instance.isUserOnboarded(userCredential.user!.uid);
       return AuthLoginResult(
-        nextStep: userExists ? AuthNextStep.main : AuthNextStep.onboarding,
+        nextStep: onboarded ? AuthNextStep.main : AuthNextStep.onboarding,
       );
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
