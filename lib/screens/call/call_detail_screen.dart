@@ -147,6 +147,7 @@ class _CallDetailScreenState extends State<CallDetailScreen>
       ),
       body: SafeArea(
         top: false,
+        bottom: false,
         child: Column(
           children: [
             Expanded(

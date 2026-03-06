@@ -313,42 +313,33 @@ class _CallScreenState extends State<CallScreen> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
       child: Column(
         children: [
-          Column(
+          Row(
             children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildPipButton(),
-                  ),
-                  Text(
-                    '추천 대화 주제',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _buildStatusCard(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (_session.remoteUsers.isNotEmpty)
-                Text(
-                  '참여자: ${_session.remoteUsers.length + 1}명',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
+              _buildPipButton(),
+              const Spacer(),
+              _buildStatusCard(),
             ],
           ),
+          const SizedBox(height: 8),
+          const Text(
+            '추천 대화 주제',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          if (_session.remoteUsers.isNotEmpty)
+            Text(
+              '참여자: ${_session.remoteUsers.length + 1}명',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
         ],
       ),
     );
