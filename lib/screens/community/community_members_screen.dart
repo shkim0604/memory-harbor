@@ -45,7 +45,13 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('우리 그룹'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text(
+          '우리 그룹',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -99,7 +105,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
                     child: Text(
                       '나레이터',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
@@ -143,7 +149,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
                     child: Text(
                       '인터뷰어 ${caregivers.length}명',
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
@@ -222,7 +228,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
         overflow: TextOverflow.ellipsis,
         softWrap: false,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           color: AppColors.secondary.withValues(alpha: 0.9),
           fontWeight: FontWeight.w600,
         ),
@@ -301,7 +307,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
                       Text(
                         name.isNotEmpty ? name : '이름 없음',
                         style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 21,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
@@ -339,7 +345,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
                             child: Text(
                               introMessage,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 15,
                                 color: AppColors.textSecondary.withValues(
                                   alpha: 0.9,
                                 ),
@@ -386,7 +392,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
       child: Text(
         fallbackChar,
         style: const TextStyle(
-          fontSize: 32,
+          fontSize: 36,
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
@@ -415,7 +421,7 @@ class _CommunityMembersScreenState extends State<CommunityMembersScreen> {
               message,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: 16,
               ),
             ),
           ),

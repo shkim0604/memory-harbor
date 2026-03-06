@@ -96,7 +96,7 @@ class _ReceiverHomeScreenState extends State<ReceiverHomeScreen> {
   }
 
   Widget _buildHeader(Group group) {
-    final memberCount = group.careGiverUserIds.length;
+    final memberCount = _viewModel.caregiverCount + 1;
     final totalCalls = _viewModel.totalCompletedCalls;
     final thisWeek = _viewModel.thisWeekCalls;
 

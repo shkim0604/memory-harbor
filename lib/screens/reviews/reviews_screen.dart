@@ -53,7 +53,10 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('리뷰'),
+        title: const Text(
+          '리뷰',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: _viewModel.reviews.isEmpty && _viewModel.isLoading

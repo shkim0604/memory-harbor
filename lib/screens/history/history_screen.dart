@@ -67,7 +67,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text("${receiver.name}'s Life"),
+        title: Text(
+          "${receiver.name}'s Life",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: _buildHistoryBody(
@@ -104,7 +107,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 isPlaceTab ? '아직 장소 데이터가 없습니다' : '아직 의미 데이터가 없습니다',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 14,
+                  fontSize: 16,
                 ),
               ),
             ),
@@ -196,7 +199,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
             color: selected ? AppColors.textPrimary : AppColors.textSecondary,
           ),
@@ -278,7 +281,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           child: Text(
                             residence.era,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: residenceColor,
                             ),
@@ -288,7 +291,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         Text(
                           residence.location,
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 19,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),
@@ -297,7 +300,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         Text(
                           residence.detail,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -306,7 +309,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           Text(
                             residenceStats!.aiSummary,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 15,
                               color: AppColors.textSecondary,
                               height: 1.4,
                             ),
@@ -333,7 +336,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         child: Text(
                           '${callSummary?.callCount ?? 0}회',
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
@@ -358,7 +361,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Text(
                     '마지막 통화: ${callSummary?.lastCallAt != null ? _formatDate(callSummary!.lastCallAt!) : '-'}',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -369,7 +372,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ? callSummary!.lastCallerName
                           : '-',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -462,7 +465,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           child: Text(
                             'Q${meaningStats.order}',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: meaningColor,
                             ),
@@ -472,7 +475,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         Text(
                           question,
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 19,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),
@@ -482,7 +485,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           Text(
                             meaningStats.aiSummary,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 15,
                               color: AppColors.textSecondary,
                               height: 1.4,
                             ),
@@ -508,7 +511,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         child: Text(
                           '$callCount회',
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
@@ -532,7 +535,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   Text(
                     '마지막 통화: ${lastCallAt != null ? _formatDate(lastCallAt) : '-'}',
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -543,7 +546,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ? callSummary!.lastCallerName
                           : '-',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,

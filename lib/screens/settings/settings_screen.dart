@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants/input_limits.dart';
+import '../../services/text_scale_service.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/settings_viewmodel.dart';
 
@@ -15,6 +17,10 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static final Uri _privacyPolicyUri = Uri.parse(
+    'https://well-cougar-28d.notion.site/Privacy-Policy-318e754e4d7d805f9904f9a2523adf73?pvs=74',
+  );
+
   final SettingsViewModel _viewModel = SettingsViewModel();
   bool _isPickingProfileImage = false;
 
@@ -30,6 +36,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _viewModel.dispose();
     super.dispose();
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final opened = await launchUrl(
+      _privacyPolicyUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('개인정보 및 보안 정책을 열지 못했습니다')),
+      );
+    }
   }
 
   Future<void> _showEditNameDialog() async {
@@ -282,6 +300,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.of(context).pushReplacementNamed('/auth');
   }
 
+  Future<void> _updateTextScalePreset(AppTextScalePreset preset) async {
+    final error = await _viewModel.updateTextScalePreset(preset);
+    if (!mounted || error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
+
   String _permissionStatusLabel(PermissionStatus? status) {
     if (status == null) return '확인 중...';
     if (status.isGranted) return '허용됨';
@@ -307,7 +331,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('설정'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text(
+          '설정',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
       body: _viewModel.isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -482,8 +512,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSettingItem(
             icon: Icons.lock_outline,
             title: '개인정보 및 보안',
-            onTap: () {},
+            onTap: _openPrivacyPolicy,
           ),
+          _buildTextScaleSetting(),
           _buildSettingItem(
             icon: Icons.camera_alt_outlined,
             title: '카메라 권한',
@@ -527,6 +558,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : null,
       trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
       onTap: onTap,
+    );
+  }
+
+  Widget _buildTextScaleSetting() {
+    final selected = _viewModel.textScalePreset;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.text_fields, color: AppColors.secondary),
+              SizedBox(width: 16),
+              Text(
+                '글씨 크기',
+                style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: AppTextScalePreset.values.map((preset) {
+                final isSelected = preset == selected;
+                return GestureDetector(
+                  onTap: () => _updateTextScalePreset(preset),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      preset.label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ class AppUser {
   final String profileImage;
   final String introMessage;
   final List<String> groupIds;
+  final String textScalePreset;
   final DateTime createdAt;
   final DateTime? lastActivityAt;
 
@@ -17,6 +18,7 @@ class AppUser {
     required this.profileImage,
     required this.introMessage,
     required this.groupIds,
+    this.textScalePreset = 'normal',
     required this.createdAt,
     this.lastActivityAt,
   });
@@ -29,6 +31,7 @@ class AppUser {
       profileImage: (json['profileImage'] ?? '') as String,
       introMessage: (json['introMessage'] ?? '') as String,
       groupIds: List<String>.from(json['groupIds'] ?? const []),
+      textScalePreset: (json['textScalePreset'] ?? 'normal') as String,
       createdAt: parseDateTime(json['createdAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
       lastActivityAt: parseDateTime(json['lastActivityAt']),
     );
@@ -41,6 +44,7 @@ class AppUser {
         'profileImage': profileImage,
         'introMessage': introMessage,
         'groupIds': groupIds,
+        'textScalePreset': textScalePreset,
         'createdAt': createdAt.toIso8601String(),
         'lastActivityAt': lastActivityAt?.toIso8601String(),
       };
@@ -52,6 +56,7 @@ class AppUser {
     String? profileImage,
     String? introMessage,
     List<String>? groupIds,
+    String? textScalePreset,
     DateTime? createdAt,
     DateTime? lastActivityAt,
   }) {
@@ -62,6 +67,7 @@ class AppUser {
       profileImage: profileImage ?? this.profileImage,
       introMessage: introMessage ?? this.introMessage,
       groupIds: groupIds ?? this.groupIds,
+      textScalePreset: textScalePreset ?? this.textScalePreset,
       createdAt: createdAt ?? this.createdAt,
       lastActivityAt: lastActivityAt ?? this.lastActivityAt,
     );

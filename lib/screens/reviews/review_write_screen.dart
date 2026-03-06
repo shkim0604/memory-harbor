@@ -394,7 +394,10 @@ class _ReviewWriteScreenState extends State<ReviewWriteScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(_existingMyReviewDocId == null ? '리뷰 작성' : '리뷰 수정/보기'),
+        title: Text(
+          _existingMyReviewDocId == null ? '리뷰 작성' : '리뷰 수정/보기',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: ListView(

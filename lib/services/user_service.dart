@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../config/agora_config.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
@@ -75,6 +76,21 @@ class UserService {
     return getUser(firebaseUser.uid);
   }
 
+  Stream<List<AppUser>> streamUsersByGroupId(String groupId) {
+    if (groupId.isEmpty) {
+      return const Stream<List<AppUser>>.empty();
+    }
+
+    return _usersCollection
+        .where('groupIds', arrayContains: groupId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AppUser.fromJson({...doc.data(), 'uid': doc.id}))
+              .toList(),
+        );
+  }
+
   // ============================================================================
   // Create new user
   // ============================================================================
@@ -85,6 +101,7 @@ class UserService {
     String? profileImage,
     required String introMessage,
     required List<String> groupIds,
+    bool isReceiver = false,
   }) async {
     if (_apiBaseUrl.trim().isEmpty) {
       throw Exception('API base URL is missing');
@@ -96,7 +113,9 @@ class UserService {
       'profileImage': profileImage,
       'introMessage': introMessage,
       'groupIds': groupIds,
+      'isReceiver': isReceiver,
     }..removeWhere((_, value) => value == null);
+    debugPrint('[UserService] createUser payload=$payload');
     final result = await _api.postJson(url, payload);
     if (result == null) {
       throw Exception('Failed to create user');
@@ -113,6 +132,7 @@ class UserService {
       profileImage: profileImage ?? '',
       introMessage: introMessage,
       groupIds: groupIds,
+      textScalePreset: 'normal',
       createdAt: now,
       lastActivityAt: now,
     );

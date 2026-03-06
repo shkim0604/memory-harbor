@@ -127,9 +127,14 @@ class CommunityMembersViewModel {
           );
 
     receiver = nextReceiver;
-    final filtered = nextCaregivers.whereType<AppUser>().toList();
+    final filtered = nextCaregivers
+        .whereType<AppUser>()
+        .where((user) => user.uid != nextGroup.receiverId)
+        .toList();
     final me = currentUser;
-    if (me != null && !filtered.any((user) => user.uid == me.uid)) {
+    if (me != null &&
+        me.uid != nextGroup.receiverId &&
+        !filtered.any((user) => user.uid == me.uid)) {
       filtered.insert(0, me);
     }
     filtered.sort((a, b) => a.name.compareTo(b.name));

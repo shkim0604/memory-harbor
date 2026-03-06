@@ -10,6 +10,7 @@ import '../services/group_service.dart';
 import '../models/group.dart';
 
 class OnboardingViewModel {
+  static const _tag = '[Onboarding]';
   bool isLoading = false;
   File? selectedImage;
   String? profileImageUrl;
@@ -73,12 +74,22 @@ class OnboardingViewModel {
       selectedGroupIds.remove(groupId);
       selectedGroupRoles.remove(groupId);
     }
+    debugPrint(
+      '$_tag toggleGroupSelection: groupId=$groupId selected=$selected '
+      'receiverLocked=${group.receiverId.isNotEmpty} '
+      'roles=$selectedGroupRoles',
+    );
     _onChanged?.call();
   }
 
   void setGroupRole(String groupId, String role) {
     if (!selectedGroupIds.contains(groupId)) return;
     selectedGroupRoles[groupId] = role;
+    final isReceiver = selectedGroupRoles.values.contains('narrator');
+    debugPrint(
+      '$_tag setGroupRole: groupId=$groupId role=$role '
+      'isReceiver=$isReceiver roles=$selectedGroupRoles',
+    );
     _onChanged?.call();
   }
 
@@ -91,8 +102,9 @@ class OnboardingViewModel {
   }
 
   Future<bool> pickImageFromCamera(BuildContext context) async {
-    final hasPermission =
-        await PermissionService.instance.requestCameraWithUI(context);
+    final hasPermission = await PermissionService.instance.requestCameraWithUI(
+      context,
+    );
     if (!hasPermission) return false;
 
     final file = await StorageService.instance.pickImageFromCamera();
@@ -122,17 +134,11 @@ class OnboardingViewModel {
         );
       }
 
-      for (final groupId in selectedGroupIds) {
-        final role = selectedGroupRoles[groupId];
-        if (role != 'narrator') continue;
-        final success = await GroupService.instance.assignReceiverIfEmpty(
-          groupId: groupId,
-          receiverId: user.uid,
-        );
-        if (!success) {
-          return '이미 Narrator가 있는 그룹입니다';
-        }
-      }
+      final isReceiver = selectedGroupRoles.values.contains('narrator');
+      debugPrint(
+        '$_tag submitProfile: selectedGroupIds=$selectedGroupIds '
+        'selectedGroupRoles=$selectedGroupRoles isReceiver=$isReceiver',
+      );
 
       await UserService.instance.createUser(
         uid: user.uid,
@@ -141,7 +147,21 @@ class OnboardingViewModel {
         profileImage: finalProfileImageUrl,
         introMessage: introMessage,
         groupIds: selectedGroupIds.toList(),
+        isReceiver: isReceiver,
       );
+
+      for (final groupId in selectedGroupIds) {
+        final role = selectedGroupRoles[groupId];
+        if (role != 'narrator') continue;
+        debugPrint('$_tag assignReceiverIfEmpty: groupId=$groupId userId=${user.uid}');
+        final success = await GroupService.instance.assignReceiverIfEmpty(
+          groupId: groupId,
+          receiverId: user.uid,
+        );
+        if (!success) {
+          return '이미 Narrator가 있는 그룹입니다';
+        }
+      }
 
       // User doc now exists — register push tokens that were deferred during sign-in.
       CallNotificationService.instance.registerTokens();

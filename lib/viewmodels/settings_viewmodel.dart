@@ -3,6 +3,7 @@ import 'package:flutter/painting.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../services/text_scale_service.dart';
 import '../services/user_service.dart';
 
 class SettingsViewModel {
@@ -23,6 +24,9 @@ class SettingsViewModel {
   void dispose() {
     _onChanged = null;
   }
+
+  AppTextScalePreset get textScalePreset =>
+      TextScaleService.instance.presetNotifier.value;
 
   Future<void> loadUser() async {
     final fetched = await UserService.instance.getCurrentUser();
@@ -141,6 +145,19 @@ class SettingsViewModel {
       return null;
     } catch (e) {
       return '한 마디 변경 실패: $e';
+    }
+  }
+
+  Future<String?> updateTextScalePreset(AppTextScalePreset preset) async {
+    try {
+      await TextScaleService.instance.setPreset(preset);
+      if (user != null) {
+        user = user!.copyWith(textScalePreset: preset.storageValue);
+      }
+      _onChanged?.call();
+      return null;
+    } catch (e) {
+      return '글씨 크기 변경 실패: $e';
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' as apple;
 
+import '../../services/text_scale_service.dart';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
@@ -208,6 +209,8 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     if (result.nextStep == AuthNextStep.main) {
+      await TextScaleService.instance.refreshFromCurrentUser();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/main');
     } else if (result.nextStep == AuthNextStep.onboarding) {
       Navigator.of(context).pushReplacementNamed('/onboarding');
@@ -224,6 +227,8 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     if (result.nextStep == AuthNextStep.main) {
+      await TextScaleService.instance.refreshFromCurrentUser();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/main');
     } else if (result.nextStep == AuthNextStep.onboarding) {
       Navigator.of(context).pushReplacementNamed('/onboarding');

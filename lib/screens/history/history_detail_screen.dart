@@ -92,7 +92,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -121,7 +121,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                         child: Text(
                           era,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
                             color: Colors.white,
                           ),
                         ),
@@ -130,7 +130,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                       Text(
                         detail,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 16,
                           color: Colors.white70,
                         ),
                       ),
@@ -194,7 +194,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               const Text(
                 '추억 스토리',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
@@ -202,7 +202,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               const Spacer(),
               Text(
                 '통화 내용 기반',
-                style: TextStyle(fontSize: 13, color: AppColors.textHint),
+                style: TextStyle(fontSize: 15, color: AppColors.textHint),
               ),
             ],
           ),
@@ -221,7 +221,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                         child: Text(
                           '아직 정리된 추억 스토리가 없습니다.',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 18,
                             color: AppColors.textSecondary,
                             height: 1.5,
                           ),
@@ -258,7 +258,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 Text(
                   story,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     color: AppColors.textSecondary,
                     height: 1.5,
                   ),
@@ -282,7 +282,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             Text(
               '통화 내역: ${calls.length}건',
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
@@ -296,7 +296,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
             padding: EdgeInsets.symmetric(vertical: 6),
             child: Text(
               '통화 내역이 없습니다.',
-              style: TextStyle(fontSize: 14, color: AppColors.textHint),
+              style: TextStyle(fontSize: 16, color: AppColors.textHint),
             ),
           )
         else
@@ -350,7 +350,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                         child: Text(
                           call.giverNameSnapshot,
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
@@ -364,7 +364,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                   Text(
                     summary,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 17,
                       color: AppColors.textSecondary,
                     ),
                     maxLines: 1,
@@ -379,13 +379,13 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               children: [
                 Text(
                   _formatDate(call.startedAt),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textHint),
+                  style: const TextStyle(fontSize: 15, color: AppColors.textHint),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _formatDuration(call.durationSec),
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 15,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
@@ -454,7 +454,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               Text(
                 '$dateText${durationText.isNotEmpty ? ' · $durationText' : ''}',
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
               ),

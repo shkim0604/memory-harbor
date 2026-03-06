@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase/firebase_config.dart';
 import 'services/call_service.dart';
 import 'services/call_notification_service.dart';
+import 'services/text_scale_service.dart';
 import 'services/user_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
@@ -69,6 +70,7 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   // Initialize push/callkit handling and token registration.
   await CallNotificationService.instance.init();
+  await TextScaleService.instance.init();
 
   // Listen for incoming call events and navigate accordingly.
   // Guard against pushing a duplicate ReceiverCallScreen (e.g. if both
@@ -207,32 +209,35 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // 중장년층 가독성을 위해 최소 텍스트 스케일을 1.15로 보장한다.
-  static const double _minReadableTextScale = 1.15;
-
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MemHarbor',
-      debugShowCheckedModeBanner: false,
-      navigatorKey: appNavigatorKey,
-      theme: AppTheme.lightTheme,
-      builder: (context, child) {
-        final mediaQuery = MediaQuery.of(context);
-        final baseScale = mediaQuery.textScaler.scale(1.0);
-        final textScaler = baseScale < _minReadableTextScale
-            ? TextScaler.linear(_minReadableTextScale)
-            : mediaQuery.textScaler;
-        return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: textScaler),
-          child: child ?? const SizedBox.shrink(),
+    return ValueListenableBuilder<AppTextScalePreset>(
+      valueListenable: TextScaleService.instance.presetNotifier,
+      builder: (context, preset, _) {
+        return MaterialApp(
+          title: 'MemHarbor',
+          debugShowCheckedModeBanner: false,
+          navigatorKey: appNavigatorKey,
+          theme: AppTheme.lightTheme,
+          builder: (context, child) {
+            final mediaQuery = MediaQuery.of(context);
+            final baseScale = mediaQuery.textScaler.scale(1.0);
+            final appliedScale =
+                baseScale > preset.scale ? baseScale : preset.scale;
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                textScaler: TextScaler.linear(appliedScale),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
+          home: const SplashScreen(),
+          routes: {
+            '/auth': (context) => const AuthScreen(),
+            '/onboarding': (context) => const OnboardingScreen(),
+            '/main': (context) => const MainNavigation(),
+          },
         );
-      },
-      home: const SplashScreen(),
-      routes: {
-        '/auth': (context) => const AuthScreen(),
-        '/onboarding': (context) => const OnboardingScreen(),
-        '/main': (context) => const MainNavigation(),
       },
     );
   }
@@ -292,6 +297,7 @@ class _SplashScreenState extends State<SplashScreen>
               .isUserOnboarded(user.uid)
               .timeout(const Duration(seconds: 4));
           if (onboarded) {
+            await TextScaleService.instance.refreshFromCurrentUser();
             nextScreen = const MainNavigation();
           } else {
             await FirebaseAuth.instance.signOut();
