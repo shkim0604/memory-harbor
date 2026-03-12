@@ -26,7 +26,7 @@ class CallSessionViewModel {
 
   CallSessionState status = CallSessionState.ended;
   bool isMuted = false;
-  bool isSpeaker = false;
+  bool isSpeaker = true;
   bool isRecording = false;
   int callDurationSeconds = 0;
   final Set<int> remoteUsers = {};
@@ -195,9 +195,9 @@ class CallSessionViewModel {
         return false;
       }
     }
-    // Default to earpiece (not speaker) at call start.
-    isSpeaker = false;
-    await agora.setSpeakerOn(false);
+    // Default to speaker at call start so all call UIs stay in sync.
+    isSpeaker = true;
+    await agora.setSpeakerOn(true);
 
     // Generate channel name: {groupId}_{user1}_{user2} or use provided channelName
     final String nextChannelName;
@@ -495,6 +495,7 @@ class CallSessionViewModel {
     agora.onJoinChannelSuccess = () {
       status = CallSessionState.connecting;
       _syncConnectingTone();
+      unawaited(_applySpeakerRoute());
       _notifyChanged();
     };
 
@@ -518,6 +519,7 @@ class CallSessionViewModel {
         _startCallTimer();
         _syncConnectingTone();
       }
+      unawaited(_applySpeakerRoute());
       _maybeStartRecording();
       _notifyChanged();
     };
@@ -705,6 +707,7 @@ class CallSessionViewModel {
   void _resetCallState() {
     status = CallSessionState.ended;
     isMuted = false;
+    isSpeaker = true;
     isRecording = false;
     remoteUsers.clear();
     _stopCallTimer();
@@ -726,6 +729,13 @@ class CallSessionViewModel {
     for (final listener in _listeners) {
       listener();
     }
+  }
+
+  Future<void> _applySpeakerRoute() async {
+    // Audio routing can flip back to earpiece around join/activation time.
+    // Re-apply the intended speaker state after the SDK finishes its updates.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await AgoraService.instance.setSpeakerOn(isSpeaker);
   }
 
   void _notifyError(String message) {

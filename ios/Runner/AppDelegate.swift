@@ -78,6 +78,7 @@ import flutter_callkit_incoming
       "callId": callId,
       "channelName": map["channelName"] ?? map["channel_name"] ?? "",
       "callerName": map["callerName"] ?? map["caller_name"] ?? callerName,
+      "callerProfileImage": map["callerProfileImage"] ?? map["caller_profile_image"] ?? "",
       "callerId": map["callerId"] ?? map["caller_id"] ?? "",
       "groupId": map["groupId"] ?? map["group_id"] ?? "",
       "receiverId": map["receiverId"] ?? map["receiver_id"] ?? "",

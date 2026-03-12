@@ -202,7 +202,9 @@ class CallNotificationService {
       debugPrint('$_tag handleIncomingMessage: payload is null — ignoring');
       return;
     }
-    debugPrint('$_tag incoming_call — callId=${payload.callId}, caller=${payload.callerName}');
+    debugPrint(
+      '$_tag incoming_call — callId=${payload.callId}, caller=${payload.callerName}, image=${payload.callerProfileImage.isNotEmpty ? payload.callerProfileImage : '(empty)'}',
+    );
 
     // Always ensure watcher & timer are active for this call, even if
     // CallKit was already shown by a VoIP push (iOS). Without this the
@@ -305,7 +307,9 @@ class CallNotificationService {
       return;
     }
 
-    debugPrint('$_tag [BG] showing CallKit for callId=${payload.callId}');
+    debugPrint(
+      '$_tag [BG] showing CallKit for callId=${payload.callId}, image=${payload.callerProfileImage.isNotEmpty ? payload.callerProfileImage : '(empty)'}',
+    );
     final params = _buildCallKitParams(payload);
     try {
       await FlutterCallkitIncoming.endAllCalls();
@@ -674,6 +678,7 @@ class CallInvitePayload {
   final String callId;
   final String channelName;
   final String callerName;
+  final String callerProfileImage;
   final String callerId;
   final String groupId;
   final String receiverId;
@@ -682,6 +687,7 @@ class CallInvitePayload {
     required this.callId,
     this.channelName = '',
     this.callerName = '',
+    this.callerProfileImage = '',
     this.callerId = '',
     this.groupId = '',
     this.receiverId = '',
@@ -691,6 +697,7 @@ class CallInvitePayload {
     'callId': callId,
     if (channelName.isNotEmpty) 'channelName': channelName,
     if (callerName.isNotEmpty) 'callerName': callerName,
+    if (callerProfileImage.isNotEmpty) 'callerProfileImage': callerProfileImage,
     if (callerId.isNotEmpty) 'callerId': callerId,
     if (groupId.isNotEmpty) 'groupId': groupId,
     if (receiverId.isNotEmpty) 'receiverId': receiverId,
@@ -706,6 +713,9 @@ class CallInvitePayload {
       channelName:
           (data['channelName'] ?? data['channel_name'] ?? '') as String,
       callerName: (data['callerName'] ?? data['caller_name'] ?? '') as String,
+      callerProfileImage:
+          (data['callerProfileImage'] ?? data['caller_profile_image'] ?? '')
+              as String,
       callerId: (data['callerId'] ?? data['caller_id'] ?? '') as String,
       groupId: (data['groupId'] ?? data['group_id'] ?? '') as String,
       receiverId: (data['receiverId'] ?? data['receiver_id'] ?? '') as String,
@@ -722,6 +732,13 @@ class CallInvitePayload {
         channelName:
             (map['channelName'] ?? map['channel_name'] ?? '') as String,
         callerName: (map['callerName'] ?? map['caller_name'] ?? '') as String,
+        callerProfileImage:
+            (map['callerProfileImage'] ??
+                    map['caller_profile_image'] ??
+                    body['callerProfileImage'] ??
+                    body['caller_profile_image'] ??
+                    '')
+                as String,
         callerId: (map['callerId'] ?? map['caller_id'] ?? '') as String,
         groupId: (map['groupId'] ?? map['group_id'] ?? '') as String,
         receiverId: (map['receiverId'] ?? map['receiver_id'] ?? '') as String,

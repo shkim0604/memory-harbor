@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../viewmodels/call_session_viewmodel.dart';
 import '../../services/call_notification_service.dart';
 import '../../widgets/call_status_indicator.dart';
+import '../../widgets/profile_avatar.dart';
 
 class ReceiverCallScreen extends StatefulWidget {
   final CallInvitePayload? payload;
@@ -64,32 +65,93 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
   @override
   Widget build(BuildContext context) {
     final callerName = widget.payload?.callerName.trim();
+    final callerProfileImage =
+        widget.payload?.callerProfileImage.trim() ?? '';
     final displayName = (callerName != null && callerName.isNotEmpty)
         ? callerName
         : '상대방';
 
     final showInCallControls =
         _accepted || _session.status == CallSessionState.onCall;
+    final showAvatarFallback = callerProfileImage.isEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.secondary,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 24),
-            _buildHeader(displayName),
-            const Spacer(),
-            _buildAvatar(displayName),
-            const SizedBox(height: 24),
-            _buildStatus(),
-            const Spacer(),
-            showInCallControls
-                ? _buildInCallControls()
-                : _buildIncomingControls(),
-            const SizedBox(height: 32),
-          ],
-        ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildBackground(callerProfileImage),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 24),
+                _buildHeader(displayName),
+                const Spacer(),
+                if (showAvatarFallback) ...[
+                  _buildAvatar(
+                    name: displayName,
+                    imageUrl: callerProfileImage,
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                _buildStatus(),
+                const Spacer(),
+                showInCallControls
+                    ? _buildInCallControls()
+                    : _buildIncomingControls(),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildBackground(String imageUrl) {
+    if (imageUrl.isEmpty) {
+      return DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.secondary, AppColors.primary],
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) {
+            return const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.secondary, AppColors.primary],
+                ),
+              ),
+            );
+          },
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.32),
+                Colors.black.withValues(alpha: 0.62),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -123,26 +185,14 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     );
   }
 
-  Widget _buildAvatar(String name) {
-    final initial = name.isNotEmpty ? name.characters.first : '?';
-    return Container(
-      width: 130,
-      height: 130,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.15),
-        border: Border.all(color: Colors.white24, width: 2),
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            fontSize: 46,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
+  Widget _buildAvatar({required String name, required String imageUrl}) {
+    return ProfileAvatar(
+      imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+      fallbackText: name,
+      size: 130,
+      borderColor: Colors.white24,
+      borderWidth: 2,
+      backgroundColor: Colors.white.withValues(alpha: 0.15),
     );
   }
 
