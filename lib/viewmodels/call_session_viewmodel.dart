@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import '../config/agora_config.dart';
 import '../services/agora_service.dart';
+import '../services/audio_route_service.dart';
 import '../services/call_service.dart';
 import '../services/permission_service.dart';
 import '../services/call_invite_service.dart';
@@ -44,6 +45,7 @@ class CallSessionViewModel {
   String? _memoLoadedCallId;
 
   Timer? _callTimer;
+  Timer? _audioRoutePollTimer;
   bool _isEnding = false;
   bool _recordingStartInFlight = false;
   final AudioPlayer _connectingPlayer = AudioPlayer();
@@ -55,6 +57,7 @@ class CallSessionViewModel {
   /// Fires when the server marks the call as cancelled/missed/declined
   /// while the client is still in connecting or ringing state.
   bool _remotelyCancelled = false;
+  bool _hadExternalAudioOutput = false;
   bool get remotelyCancelled => _remotelyCancelled;
 
   void addListener(VoidCallback listener) {
@@ -79,6 +82,7 @@ class CallSessionViewModel {
 
   void dispose() {
     _callTimer?.cancel();
+    _audioRoutePollTimer?.cancel();
     _stopWatchingCallStatus();
     AgoraService.instance.dispose();
     _connectingPlayer.dispose();
@@ -195,9 +199,8 @@ class CallSessionViewModel {
         return false;
       }
     }
-    // Default to speaker at call start so all call UIs stay in sync.
-    isSpeaker = true;
-    await agora.setSpeakerOn(true);
+    await _applyInitialAudioRoute(agora);
+    _startAudioRoutePolling();
 
     // Generate channel name: {groupId}_{user1}_{user2} or use provided channelName
     final String nextChannelName;
@@ -559,6 +562,26 @@ class CallSessionViewModel {
     _callTimer = null;
   }
 
+  void _startAudioRoutePolling() {
+    _audioRoutePollTimer?.cancel();
+    _audioRoutePollTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      unawaited(_syncExternalAudioRoute());
+    });
+  }
+
+  Future<void> _syncExternalAudioRoute() async {
+    if (_isEnding || status == CallSessionState.ended) return;
+    final hasExternalAudio =
+        await AudioRouteService.instance.hasExternalAudioOutput();
+    if (hasExternalAudio == _hadExternalAudioOutput) return;
+    _hadExternalAudioOutput = hasExternalAudio;
+    if (!hasExternalAudio) return;
+
+    isSpeaker = false;
+    await AgoraService.instance.setSpeakerOn(false);
+    _notifyChanged();
+  }
+
   void _maybeStartRecording() {
     if (isRecording) return;
     if (_recordingStartInFlight) return;
@@ -709,6 +732,9 @@ class CallSessionViewModel {
     isMuted = false;
     isSpeaker = true;
     isRecording = false;
+    _hadExternalAudioOutput = false;
+    _audioRoutePollTimer?.cancel();
+    _audioRoutePollTimer = null;
     remoteUsers.clear();
     _stopCallTimer();
     _syncConnectingTone();
@@ -732,10 +758,33 @@ class CallSessionViewModel {
   }
 
   Future<void> _applySpeakerRoute() async {
-    // Audio routing can flip back to earpiece around join/activation time.
-    // Re-apply the intended speaker state after the SDK finishes its updates.
+    // Audio routing can flip around join/activation time.
+    // Re-check external outputs before forcing the route so iOS Bluetooth
+    // devices that become visible after audio-session activation win.
     await Future<void>.delayed(const Duration(milliseconds: 200));
+    final hasExternalAudio =
+        await AudioRouteService.instance.hasExternalAudioOutput();
+    _hadExternalAudioOutput = hasExternalAudio;
+    if (hasExternalAudio) {
+      isSpeaker = false;
+      await AgoraService.instance.setSpeakerOn(false);
+      _notifyChanged();
+      return;
+    }
     await AgoraService.instance.setSpeakerOn(isSpeaker);
+  }
+
+  Future<void> _applyInitialAudioRoute(AgoraService agora) async {
+    final hasExternalAudio =
+        await AudioRouteService.instance.hasExternalAudioOutput();
+    _hadExternalAudioOutput = hasExternalAudio;
+    isSpeaker = !hasExternalAudio;
+    if (Platform.isIOS && !hasExternalAudio) {
+      // iOS can report no route before the audio session is activated.
+      // Let the later join/activation hook decide the actual route.
+      return;
+    }
+    await agora.setSpeakerOn(isSpeaker);
   }
 
   void _notifyError(String message) {

@@ -10,12 +10,31 @@ import flutter_callkit_incoming
 @objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate, CallkitIncomingAppDelegate {
   // Keep a strong reference to PKPushRegistry; otherwise VoIP pushes can stop in background.
   private var voipRegistry: PKPushRegistry?
+  private let audioRouteChannelName = "memory_harbor/audio_route"
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     UNUserNotificationCenter.current().delegate = self
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let channel = FlutterMethodChannel(
+        name: audioRouteChannelName,
+        binaryMessenger: controller.binaryMessenger
+      )
+      channel.setMethodCallHandler { [weak self] call, result in
+        guard let self else {
+          result(false)
+          return
+        }
+        switch call.method {
+        case "hasExternalAudioOutput":
+          result(self.hasExternalAudioOutput())
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
 
     // Register for VoIP pushes (required for CallKit in terminated/background).
     let mainQueue = DispatchQueue.main
@@ -122,5 +141,17 @@ import flutter_callkit_incoming
 
   func didDeactivateAudioSession(_ audioSession: AVAudioSession) {
     // No-op: audio handled in Flutter/Agora layer.
+  }
+
+  private func hasExternalAudioOutput() -> Bool {
+    let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+    return outputs.contains { output in
+      switch output.portType {
+      case .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .headphones, .airPlay:
+        return true
+      default:
+        return false
+      }
+    }
   }
 }
