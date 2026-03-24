@@ -6,6 +6,7 @@ import '../services/care_receiver_service.dart';
 import '../services/group_service.dart';
 import '../services/user_service.dart';
 import '../services/call_service.dart';
+import '../utils/call_topic_match_utils.dart';
 import '../utils/time_utils.dart';
 
 enum HistoryStatus {
@@ -58,9 +59,9 @@ class HistoryViewModel {
     status = HistoryStatus.loadingUser;
     onChanged();
 
-    _userSub = UserService.instance
-        .streamUser(firebaseUser!.uid)
-        .listen((nextUser) {
+    _userSub = UserService.instance.streamUser(firebaseUser!.uid).listen((
+      nextUser,
+    ) {
       if (nextUser == null) {
         // Receiver accounts may not have a user document.
         _subscribeGroupByReceiver(firebaseUser!.uid, onChanged);
@@ -113,16 +114,16 @@ class HistoryViewModel {
     _receiverGroupSub = GroupService.instance
         .streamGroupByReceiverId(receiverId)
         .listen((nextGroup) {
-      group = nextGroup;
-      if (nextGroup == null) {
-        _clearGroupState();
-        status = HistoryStatus.noGroup;
-        onChanged();
-        return;
-      }
+          group = nextGroup;
+          if (nextGroup == null) {
+            _clearGroupState();
+            status = HistoryStatus.noGroup;
+            onChanged();
+            return;
+          }
 
-      _subscribeReceiver(nextGroup.receiverId, onChanged);
-    });
+          _subscribeReceiver(nextGroup.receiverId, onChanged);
+        });
   }
 
   void _subscribeReceiver(String receiverId, void Function() onChanged) {
@@ -133,17 +134,17 @@ class HistoryViewModel {
     _receiverSub = CareReceiverService.instance
         .streamReceiver(receiverId)
         .listen((nextReceiver) {
-      receiver = nextReceiver;
-      if (nextReceiver == null) {
-        status = HistoryStatus.loadingReceiver;
-        onChanged();
-        return;
-      }
+          receiver = nextReceiver;
+          if (nextReceiver == null) {
+            status = HistoryStatus.loadingReceiver;
+            onChanged();
+            return;
+          }
 
-      _subscribeResidenceStats(nextReceiver.receiverId, onChanged);
-      _subscribeMeaningStats(nextReceiver.receiverId, onChanged);
-      _subscribeCalls(nextReceiver.receiverId, onChanged);
-    });
+          _subscribeResidenceStats(nextReceiver.receiverId, onChanged);
+          _subscribeMeaningStats(nextReceiver.receiverId, onChanged);
+          _subscribeCalls(nextReceiver.receiverId, onChanged);
+        });
   }
 
   void _subscribeResidenceStats(String receiverId, void Function() onChanged) {
@@ -154,17 +155,17 @@ class HistoryViewModel {
     _statsSub = CareReceiverService.instance
         .streamResidenceStats(receiverId)
         .listen((nextStats) {
-      statsList = nextStats;
-      status = HistoryStatus.ready;
-      onChanged();
-    });
+          statsList = nextStats;
+          status = HistoryStatus.ready;
+          onChanged();
+        });
   }
 
   void _subscribeCalls(String receiverId, void Function() onChanged) {
     _callsSub?.cancel();
-    _callsSub = CallService.instance
-        .streamCallsByReceiver(receiverId)
-        .listen((nextCalls) {
+    _callsSub = CallService.instance.streamCallsByReceiver(receiverId).listen((
+      nextCalls,
+    ) {
       calls = nextCalls;
       if (status == HistoryStatus.ready) {
         onChanged();
@@ -177,11 +178,11 @@ class HistoryViewModel {
     _meaningSub = CareReceiverService.instance
         .streamMeaningStats(receiverId)
         .listen((nextStats) {
-      meaningStatsList = nextStats;
-      if (status == HistoryStatus.ready) {
-        onChanged();
-      }
-    });
+          meaningStatsList = nextStats;
+          if (status == HistoryStatus.ready) {
+            onChanged();
+          }
+        });
   }
 
   void _clearGroupState() {
@@ -216,15 +217,17 @@ class HistoryViewModel {
 
   Map<String, ResidenceCallSummary> get residenceCallSummaryMap {
     final map = <String, ResidenceCallSummary>{};
-    for (final call in completedCalls) {
-      final mentioned = call.mentionedResidences;
-      if (mentioned.isEmpty) continue;
-      for (final residence in mentioned) {
-        if (residence.residenceId.isEmpty) continue;
-        final current = map[residence.residenceId] ?? const ResidenceCallSummary();
-        final shouldUpdateLast = current.lastCallAt == null ||
+    for (final stats in statsList) {
+      if (stats.residenceId.trim().isEmpty) continue;
+      for (final call in completedCalls) {
+        if (!CallTopicMatchUtils.matchesResidence(call, stats.residenceId)) {
+          continue;
+        }
+        final current = map[stats.residenceId] ?? const ResidenceCallSummary();
+        final shouldUpdateLast =
+            current.lastCallAt == null ||
             call.startedAt.isAfter(current.lastCallAt!);
-        map[residence.residenceId] = ResidenceCallSummary(
+        map[stats.residenceId] = ResidenceCallSummary(
           callCount: current.callCount + 1,
           lastCallAt: shouldUpdateLast ? call.startedAt : current.lastCallAt,
           lastCallerName: shouldUpdateLast
@@ -239,23 +242,23 @@ class HistoryViewModel {
   Map<String, ResidenceCallSummary> get meaningCallSummaryMap {
     final map = <String, ResidenceCallSummary>{};
     for (final call in completedCalls) {
-      final meaningId = call.selectedMeaningId.trim().isNotEmpty
-          ? call.selectedMeaningId.trim()
-          : (call.selectedTopicType == 'meaning'
-                ? call.selectedTopicId.trim()
-                : '');
-      if (meaningId.isEmpty) continue;
+      for (final stats in meaningStatsList) {
+        if (!CallTopicMatchUtils.matchesMeaning(call, stats.meaningId)) {
+          continue;
+        }
 
-      final current = map[meaningId] ?? const ResidenceCallSummary();
-      final shouldUpdateLast = current.lastCallAt == null ||
-          call.startedAt.isAfter(current.lastCallAt!);
-      map[meaningId] = ResidenceCallSummary(
-        callCount: current.callCount + 1,
-        lastCallAt: shouldUpdateLast ? call.startedAt : current.lastCallAt,
-        lastCallerName: shouldUpdateLast
-            ? call.giverNameSnapshot
-            : current.lastCallerName,
-      );
+        final current = map[stats.meaningId] ?? const ResidenceCallSummary();
+        final shouldUpdateLast =
+            current.lastCallAt == null ||
+            call.startedAt.isAfter(current.lastCallAt!);
+        map[stats.meaningId] = ResidenceCallSummary(
+          callCount: current.callCount + 1,
+          lastCallAt: shouldUpdateLast ? call.startedAt : current.lastCallAt,
+          lastCallerName: shouldUpdateLast
+              ? call.giverNameSnapshot
+              : current.lastCallerName,
+        );
+      }
     }
     return map;
   }

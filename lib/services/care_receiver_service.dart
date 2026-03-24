@@ -33,6 +33,7 @@ class CareReceiverService {
     return _receiversCollection
         .doc(receiverId)
         .collection('residence_stats')
+        .orderBy('order')
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {

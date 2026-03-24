@@ -40,6 +40,7 @@ class ResidenceStats {
   final DateTime? lastCallAt;
   final String aiSummary;
   final List<String> humanComments;
+  final int order;
 
   const ResidenceStats({
     required this.groupId,
@@ -53,6 +54,7 @@ class ResidenceStats {
     this.lastCallAt,
     this.aiSummary = '',
     this.humanComments = const [],
+    this.order = 0,
   });
 
   factory ResidenceStats.fromJson(Map<String, dynamic> json) => ResidenceStats(
@@ -67,6 +69,7 @@ class ResidenceStats {
         lastCallAt: parseDateTime(json['lastCallAt']),
         aiSummary: (json['aiSummary'] ?? '') as String,
         humanComments: List<String>.from(json['humanComments'] ?? const []),
+        order: (json['order'] ?? 0) as int,
       );
 
   Map<String, dynamic> toJson() => {
@@ -81,5 +84,6 @@ class ResidenceStats {
         'lastCallAt': lastCallAt?.toIso8601String(),
         'aiSummary': aiSummary,
         'humanComments': humanComments,
+        'order': order,
       };
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../models/models.dart';
 import '../../services/call_service.dart';
+import '../../services/review_service.dart';
 import '../../viewmodels/history_detail_viewmodel.dart';
 import '../../utils/time_utils.dart';
 
@@ -64,6 +65,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     _viewModel.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final bulletStories = isMeaningTopic
@@ -228,7 +230,9 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                         ),
                       )
                     : Column(
-                        children: stories.map((story) => _buildStoryItem(story)).toList(),
+                        children: stories
+                            .map((story) => _buildStoryItem(story))
+                            .toList(),
                       ),
               ),
             ),
@@ -319,8 +323,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
   }
 
   Widget _buildCallHistoryCard(Call call) {
-    final summary =
-        call.humanSummary.isNotEmpty ? call.humanSummary : call.humanNotes;
+    final summary = _resolveSummaryText(call);
 
     return GestureDetector(
       onTap: () => _showSummaryPopupForCall(call),
@@ -379,7 +382,10 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
               children: [
                 Text(
                   _formatDate(call.startedAt),
-                  style: const TextStyle(fontSize: 15, color: AppColors.textHint),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textHint,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -398,28 +404,53 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
     );
   }
 
+  String _resolveSummaryText(Call call) {
+    final cached = (_summaryByCallId[call.callId] ?? '').trim();
+    if (cached.isNotEmpty) return cached;
+    if (call.humanSummary.trim().isNotEmpty) return call.humanSummary.trim();
+    if (call.humanNotes.trim().isNotEmpty) return call.humanNotes.trim();
+    return '';
+  }
+
   String _resolveSummaryTextFromDoc(Map<String, dynamic>? data) {
     if (data == null) return '';
     final summary = (data['humanSummary'] ?? '').toString().trim();
     if (summary.isNotEmpty) return summary;
-    final notes =
-        (data['humanNotes'] ?? data['hhumanNotes'] ?? '').toString().trim();
+    final notes = (data['humanNotes'] ?? data['hhumanNotes'] ?? '')
+        .toString()
+        .trim();
     if (notes.isNotEmpty) return notes;
     return '';
   }
 
-  Future<String> _fetchSummaryFromCallDoc(Call call) async {
+  Future<String> _fetchSummaryFromReviewContext(Call call) async {
+    try {
+      final contextData = await ReviewService.instance.fetchContext(
+        callId: call.callId,
+      );
+      return contextData?.humanNotes.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<String> _fetchSummaryText(Call call) async {
     if (call.callId.isEmpty) return '';
     if (_summaryByCallId.containsKey(call.callId)) {
       return _summaryByCallId[call.callId] ?? '';
     }
     try {
       final data = await CallService.instance.getCallDoc(call.callId);
-      final nextText = _resolveSummaryTextFromDoc(data);
+      var nextText = _resolveSummaryTextFromDoc(data);
+      if (nextText.isEmpty) {
+        nextText = await _fetchSummaryFromReviewContext(call);
+      }
       _summaryByCallId[call.callId] = nextText;
       return nextText;
     } catch (_) {
-      return '';
+      final fallback = await _fetchSummaryFromReviewContext(call);
+      _summaryByCallId[call.callId] = fallback;
+      return fallback;
     }
   }
 
@@ -429,14 +460,14 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
         : '알 수 없음';
     final dateText = _formatDate(call.startedAt);
     final durationText = _formatDuration(call.durationSec);
-    var summaryText = _summaryByCallId[call.callId];
-    if (summaryText == null) {
+    var summaryText = _resolveSummaryText(call);
+    if (summaryText.isEmpty) {
       showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
-      summaryText = await _fetchSummaryFromCallDoc(call);
+      summaryText = await _fetchSummaryText(call);
       if (!mounted) return;
       Navigator.of(context).pop();
       setState(() {});
@@ -459,7 +490,7 @@ class _HistoryDetailScreenState extends State<HistoryDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(summaryText ?? ''),
+              Text(summaryText),
             ],
           ),
         ),

@@ -145,7 +145,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   meaningStatsList.length,
                 );
               },
-              childCount: isPlaceTab ? statsList.length : meaningStatsList.length,
+              childCount: isPlaceTab
+                  ? statsList.length
+                  : meaningStatsList.length,
             ),
           ),
         ),
@@ -218,6 +220,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     int totalCount,
   ) {
     final residenceColor = _residenceColorByOrder(index, totalCount);
+    final callCount = residenceStats?.totalCalls ?? callSummary?.callCount ?? 0;
+    final lastCallAt = residenceStats?.lastCallAt ?? callSummary?.lastCallAt;
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -334,7 +338,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${callSummary?.callCount ?? 0}회',
+                          '$callCount회',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -359,7 +363,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Row(
                 children: [
                   Text(
-                    '마지막 통화: ${callSummary?.lastCallAt != null ? _formatDate(callSummary!.lastCallAt!) : '-'}',
+                    '마지막 통화: ${lastCallAt != null ? _formatDate(lastCallAt) : '-'}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,

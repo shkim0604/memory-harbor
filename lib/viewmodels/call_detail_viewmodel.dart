@@ -3,6 +3,7 @@ import 'dart:async';
 import '../models/models.dart';
 import '../services/call_service.dart';
 import '../services/care_receiver_service.dart';
+import '../utils/call_topic_match_utils.dart';
 
 enum CallDetailStatus { loading, ready }
 
@@ -36,13 +37,9 @@ class CallDetailViewModel {
     ) {
       previousCalls = calls.where((call) {
         if (topicType == 'meaning') {
-          return call.selectedMeaningId == topicId ||
-              (call.selectedTopicType == 'meaning' &&
-                  call.selectedTopicId == topicId);
+          return CallTopicMatchUtils.matchesMeaning(call, topicId);
         }
-        return call.mentionedResidences.any(
-          (residence) => residence.residenceId == topicId,
-        );
+        return CallTopicMatchUtils.matchesResidence(call, topicId);
       }).toList();
       status = CallDetailStatus.ready;
       _onChanged?.call();
