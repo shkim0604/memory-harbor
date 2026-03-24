@@ -66,11 +66,6 @@ Future<void> main() async {
   _lifecycleLogger.register();
   TimeUtils.initialize();
   await FirebaseConfig.initialize();
-  // FCM background handler must be registered before runApp.
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  // Initialize push/callkit handling and token registration.
-  await CallNotificationService.instance.init();
-  await TextScaleService.instance.init();
 
   // Listen for incoming call events and navigate accordingly.
   // Guard against pushing a duplicate ReceiverCallScreen (e.g. if both
@@ -172,15 +167,8 @@ Future<void> main() async {
       );
       pendingIncoming = event;
       if (event.autoStart) {
-        debugPrint('$_lifeTag autoStart in background -> accept call silently');
-        unawaited(
-          CallSessionViewModel.instance.acceptIncomingSilent(
-            payload: event.payload,
-          ),
-        );
-        pendingIncoming = IncomingCallEvent(
-          payload: event.payload,
-          autoStart: false,
+        debugPrint(
+          '$_lifeTag autoStart deferred until resumed to avoid background accept race',
         );
       }
       return;
@@ -203,7 +191,17 @@ Future<void> main() async {
         });
   });
 
+  // FCM background handler must be registered before runApp.
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Initialize push/callkit handling and token registration.
+  await CallNotificationService.instance.init();
+  await TextScaleService.instance.init();
+
   runApp(const MyApp());
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    debugPrint('$_lifeTag first frame -> tryHandlePending');
+    unawaited(tryHandlePending());
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -286,6 +284,11 @@ class _SplashScreenState extends State<SplashScreen>
     // Check auth state and navigate
     Future.delayed(const Duration(milliseconds: 2500), () async {
       if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) {
+        debugPrint('Splash navigation skipped: route is no longer current');
+        return;
+      }
 
       Widget nextScreen = const AuthScreen();
       try {
@@ -312,6 +315,13 @@ class _SplashScreenState extends State<SplashScreen>
       }
 
       if (mounted) {
+        final currentRoute = ModalRoute.of(context);
+        if (currentRoute != null && !currentRoute.isCurrent) {
+          debugPrint(
+            'Splash navigation skipped after auth check: route is no longer current',
+          );
+          return;
+        }
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => nextScreen,

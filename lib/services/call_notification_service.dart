@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -14,6 +15,9 @@ import 'user_service.dart';
 import 'call_service.dart';
 
 const String _tag = '[CNS]'; // CallNotificationService log prefix
+const MethodChannel _callkitLaunchChannel = MethodChannel(
+  'memory_harbor/callkit_launch',
+);
 
 /// Emitted when the user should be navigated to a call screen.
 class IncomingCallEvent {
@@ -65,6 +69,7 @@ class CallNotificationService {
     }
 
     _listenCallkitEvents();
+    await _recoverPendingCallkitLaunchAction();
     debugPrint('$_tag init() done');
   }
 
@@ -75,6 +80,7 @@ class CallNotificationService {
       if (!status.isGranted) {
         await Permission.notification.request();
       }
+      await _requestFullScreenIntentPermission();
     }
     await FirebaseMessaging.instance.requestPermission(
       alert: true,
@@ -85,6 +91,19 @@ class CallNotificationService {
       provisional: false,
       sound: true,
     );
+  }
+
+  Future<void> _requestFullScreenIntentPermission() async {
+    try {
+      final canUse =
+          await FlutterCallkitIncoming.canUseFullScreenIntent() == true;
+      debugPrint('$_tag fullScreenIntent allowed=$canUse');
+      if (canUse) return;
+      await FlutterCallkitIncoming.requestFullIntentPermission();
+      debugPrint('$_tag fullScreenIntent permission requested');
+    } catch (e) {
+      debugPrint('$_tag fullScreenIntent permission check failed: $e');
+    }
   }
 
   Future<void> registerTokens() => _registerTokens();
@@ -329,117 +348,137 @@ class CallNotificationService {
     _callkitSub = FlutterCallkitIncoming.onEvent.listen((event) async {
       final name = (event?.event ?? '').toString();
       final body = event?.body ?? const <String, dynamic>{};
-      final callId = (body['id'] ?? body['callId'] ?? '') as String;
-      final payload = CallInvitePayload.fromEventBody(body);
+      await _handleCallkitEvent(name, body);
+    });
+  }
 
-      debugPrint('$_tag CallKit event: $name, callId=$callId');
+  Future<void> _recoverPendingCallkitLaunchAction() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final raw = await _callkitLaunchChannel.invokeMethod<dynamic>(
+        'getAndClearPendingCallkitAction',
+      );
+      if (raw is! Map) return;
+      final map = Map<String, dynamic>.from(raw);
+      final event = (map['event'] ?? '').toString().trim();
+      final bodyRaw = map['body'];
+      if (event.isEmpty || bodyRaw is! Map) return;
+      final body = Map<String, dynamic>.from(bodyRaw);
+      debugPrint(
+        '$_tag recovering pending CallKit launch action: event=$event, callId=${body['id'] ?? body['callId'] ?? ''}',
+      );
+      await _handleCallkitEvent(event, body);
+    } catch (e) {
+      debugPrint('$_tag recover pending CallKit action failed: $e');
+    }
+  }
 
-      final isAccept =
-          name == 'ACTION_CALL_ACCEPT' ||
-          name == 'CALL_ACCEPT' ||
-          name.contains('actionCallAccept');
-      final isDecline =
-          name == 'ACTION_CALL_DECLINE' ||
-          name == 'CALL_DECLINE' ||
-          name.contains('actionCallDecline');
-      final isTimeout =
-          name == 'ACTION_CALL_TIMEOUT' ||
-          name == 'CALL_TIMEOUT' ||
-          name.contains('actionCallTimeout');
-      final isEnd =
-          name == 'ACTION_CALL_ENDED' ||
-          name == 'CALL_ENDED' ||
-          name.contains('actionCallEnded') ||
-          name.contains('actionCallEnd');
-      final isIncoming =
-          name == 'ACTION_CALL_INCOMING' ||
-          name.contains('actionCallIncoming');
-      final isVoipTokenUpdate =
-          name.contains('DID_UPDATE_DEVICE_PUSH_TOKEN_VOIP') ||
-          name.contains('actionDidUpdateDevicePushTokenVoip');
+  Future<void> _handleCallkitEvent(
+    String name,
+    Map<String, dynamic> body,
+  ) async {
+    final callId = (body['id'] ?? body['callId'] ?? '') as String;
+    final payload = CallInvitePayload.fromEventBody(body);
 
-      // When CallKit / notification displays an incoming call (any trigger
-      // path, including iOS VoIP push from AppDelegate), ensure the
-      // Firestore watcher and missed timer are running so we can detect
-      // caller cancellation immediately.
-      if (isIncoming && callId.isNotEmpty) {
-        debugPrint('$_tag ACTION_CALL_INCOMING — starting watcher & timer for callId=$callId');
-        _scheduleMissedTimeout(callId);
-        _watchIncomingCallStatus(callId);
+    debugPrint('$_tag CallKit event: $name, callId=$callId');
+
+    final isAccept =
+        name == 'ACTION_CALL_ACCEPT' ||
+        name == 'CALL_ACCEPT' ||
+        name.contains('actionCallAccept');
+    final isDecline =
+        name == 'ACTION_CALL_DECLINE' ||
+        name == 'CALL_DECLINE' ||
+        name.contains('actionCallDecline');
+    final isTimeout =
+        name == 'ACTION_CALL_TIMEOUT' ||
+        name == 'CALL_TIMEOUT' ||
+        name.contains('actionCallTimeout');
+    final isEnd =
+        name == 'ACTION_CALL_ENDED' ||
+        name == 'CALL_ENDED' ||
+        name.contains('actionCallEnded') ||
+        name.contains('actionCallEnd');
+    final isIncoming =
+        name == 'ACTION_CALL_INCOMING' ||
+        name.contains('actionCallIncoming');
+    final isVoipTokenUpdate =
+        name.contains('DID_UPDATE_DEVICE_PUSH_TOKEN_VOIP') ||
+        name.contains('actionDidUpdateDevicePushTokenVoip');
+
+    if (isIncoming && callId.isNotEmpty) {
+      debugPrint(
+        '$_tag ACTION_CALL_INCOMING — starting watcher & timer for callId=$callId',
+      );
+      _scheduleMissedTimeout(callId);
+      _watchIncomingCallStatus(callId);
+    }
+
+    if (isAccept) {
+      debugPrint('$_tag ACCEPT — callId=$callId, payload=${payload != null}');
+      if (callId.isNotEmpty && _acceptHandled.contains(callId)) {
+        debugPrint('$_tag ACCEPT ignored (duplicate) — callId=$callId');
+        return;
       }
+      if (callId.isNotEmpty) {
+        _acceptHandled.add(callId);
+        _cancelMissedTimeout(callId);
+        _stopWatchingIncoming(callId);
+        _markCallkitHandled(callId);
+      }
+      await _emitIncomingCallWithFallback(payload, callId);
+    }
 
-      // Accept -> open CallScreen (API accept is handled by
-      // CallSessionViewModel.acceptIncoming to avoid double-call).
-      if (isAccept) {
-        debugPrint('$_tag ACCEPT — callId=$callId, payload=${payload != null}');
-        if (callId.isNotEmpty && _acceptHandled.contains(callId)) {
-          debugPrint('$_tag ACCEPT ignored (duplicate) — callId=$callId');
+    if (isDecline) {
+      debugPrint('$_tag DECLINE — callId=$callId');
+      if (callId.isNotEmpty) {
+        _cancelMissedTimeout(callId);
+        _stopWatchingIncoming(callId);
+        _markCallkitHandled(callId);
+        CallInviteService.instance.answerCall(
+          callId: callId,
+          action: 'decline',
+        );
+      }
+    }
+
+    if (isTimeout) {
+      debugPrint('$_tag TIMEOUT — callId=$callId');
+      if (callId.isNotEmpty) {
+        _cancelMissedTimeout(callId);
+        _stopWatchingIncoming(callId);
+        _markCallkitHandled(callId);
+        CallInviteService.instance.missedCall(callId: callId);
+      }
+    }
+
+    if (isEnd) {
+      debugPrint('$_tag END — callId=$callId');
+      if (callId.isNotEmpty) {
+        if (_endHandled.contains(callId)) {
+          debugPrint('$_tag END ignored (duplicate) — callId=$callId');
           return;
         }
-        if (callId.isNotEmpty) {
-          _acceptHandled.add(callId);
-          _cancelMissedTimeout(callId);
-          _stopWatchingIncoming(callId);
-          _markCallkitHandled(callId);
-        }
-        _emitIncomingCallWithFallback(payload, callId);
-      }
-
-      if (isDecline) {
-        debugPrint('$_tag DECLINE — callId=$callId');
-        if (callId.isNotEmpty) {
-          _cancelMissedTimeout(callId);
-          _stopWatchingIncoming(callId);
-          _markCallkitHandled(callId);
-          CallInviteService.instance.answerCall(
+        _endHandled.add(callId);
+        _cancelMissedTimeout(callId);
+        _stopWatchingIncoming(callId);
+        _markCallkitHandled(callId);
+        final accepted = _acceptHandled.contains(callId);
+        if (accepted) {
+          await CallInviteService.instance.endCall(callId: callId);
+        } else {
+          await CallInviteService.instance.answerCall(
             callId: callId,
             action: 'decline',
           );
         }
       }
+    }
 
-      if (isTimeout) {
-        debugPrint('$_tag TIMEOUT — callId=$callId');
-        if (callId.isNotEmpty) {
-          _cancelMissedTimeout(callId);
-          _stopWatchingIncoming(callId);
-          _markCallkitHandled(callId);
-          CallInviteService.instance.missedCall(callId: callId);
-        }
-      }
-
-      // End from native CallKit (e.g. iOS lock screen hang-up) may bypass
-      // in-app CallSessionViewModel.endCall(). Reflect it to server so the
-      // caller side watcher can terminate immediately.
-      if (isEnd) {
-        debugPrint('$_tag END — callId=$callId');
-        if (callId.isNotEmpty) {
-          if (_endHandled.contains(callId)) {
-            debugPrint('$_tag END ignored (duplicate) — callId=$callId');
-            return;
-          }
-          _endHandled.add(callId);
-          _cancelMissedTimeout(callId);
-          _stopWatchingIncoming(callId);
-          _markCallkitHandled(callId);
-          final accepted = _acceptHandled.contains(callId);
-          if (accepted) {
-            await CallInviteService.instance.endCall(callId: callId);
-          } else {
-            await CallInviteService.instance.answerCall(
-              callId: callId,
-              action: 'decline',
-            );
-          }
-        }
-      }
-
-      // VoIP token delivered or rotated by PKPushRegistry.
-      if (isVoipTokenUpdate) {
-        debugPrint('$_tag VoIP token update event received');
-        _handleVoipTokenUpdate(body);
-      }
-    });
+    if (isVoipTokenUpdate) {
+      debugPrint('$_tag VoIP token update event received');
+      _handleVoipTokenUpdate(body);
+    }
   }
 
   /// Try to fetch and register VoIP token, retrying up to [maxAttempts] times

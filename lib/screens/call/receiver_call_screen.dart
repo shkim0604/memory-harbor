@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import '../../theme/app_colors.dart';
 import '../../viewmodels/call_session_viewmodel.dart';
 import '../../services/call_notification_service.dart';
@@ -31,11 +30,11 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
       // Server cancelled the call while still ringing.
       if (_session.remotelyCancelled &&
           _session.status == CallSessionState.ended) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        _returnToMain();
         return;
       }
       if (_session.status == CallSessionState.ended) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        _returnToMain();
         return;
       }
       if (_session.status == CallSessionState.onCall && !_accepted) {
@@ -160,15 +159,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(
-              Icons.keyboard_arrow_down,
-              color: Colors.white,
-              size: Platform.isIOS ? 28 : 24,
-            ),
-            tooltip: '작게 보기',
-          ),
+          const SizedBox(width: 40),
           const Spacer(),
           Text(
             name,
@@ -383,9 +374,7 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     if (payload != null && payload.callId.isNotEmpty) {
       await _session.declineIncoming(callId: payload.callId);
     }
-    if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+    _returnToMain();
     _actionLocked = false;
   }
 
@@ -424,5 +413,12 @@ class _ReceiverCallScreenState extends State<ReceiverCallScreen> {
     } finally {
       _actionLocked = false;
     }
+  }
+
+  void _returnToMain() {
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil('/main', (route) => false);
   }
 }
