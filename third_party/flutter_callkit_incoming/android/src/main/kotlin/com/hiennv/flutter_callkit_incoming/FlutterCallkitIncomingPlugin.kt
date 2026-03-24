@@ -46,6 +46,10 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
             return eventHandlers.reapCollection().isNotEmpty()
         }
 
+        fun hasAttachedActivity(): Boolean {
+            return hasInstance() && instance.activity != null
+        }
+
         fun sendEvent(event: String, body: Map<String, Any?>) {
             eventHandlers.reapCollection().forEach {
                 it.get()?.send(event, body)

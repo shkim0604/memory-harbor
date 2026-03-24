@@ -131,12 +131,12 @@ class CallkitIncomingBroadcastReceiver : BroadcastReceiver() {
 
             "${context.packageName}.${CallkitConstants.ACTION_CALL_DECLINE}" -> {
                 try {
-                    val hadFlutterHandlers = FlutterCallkitIncomingPlugin.hasEventHandlers()
+                    val hasAttachedActivity = FlutterCallkitIncomingPlugin.hasAttachedActivity()
                     // clear notification
                     callkitNotificationManager?.clearIncomingNotification(data, false)
                     sendEventFlutter(CallkitConstants.ACTION_CALL_DECLINE, data)
                     removeCall(context, Data.fromBundle(data))
-                    if (!hadFlutterHandlers) {
+                    if (!hasAttachedActivity) {
                         AppUtils.getAppIntent(
                             context,
                             CallkitConstants.ACTION_CALL_DECLINE,
